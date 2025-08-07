@@ -1,8 +1,11 @@
-import { Component } from '@angular/core';
+// src/app/core/authentication/login/login.component.ts
+
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import { SessionService } from '../../services/session.service';
 
 @Component({
   selector: 'app-login',
@@ -24,7 +27,8 @@ import { AuthService } from '../services/auth.service';
               name="username"
               required
               class="form-input"
-              placeholder="Enter your username">
+              placeholder="Enter your username"
+              autocomplete="username">
           </div>
 
           <div class="form-group">
@@ -36,7 +40,19 @@ import { AuthService } from '../services/auth.service';
               name="password"
               required
               class="form-input"
-              placeholder="Enter your password">
+              placeholder="Enter your password"
+              autocomplete="current-password">
+          </div>
+
+          <div class="form-group">
+            <label class="remember-me">
+              <input
+                type="checkbox"
+                [(ngModel)]="rememberMe"
+                name="rememberMe"
+                class="checkbox-input">
+              <span>Remember me</span>
+            </label>
           </div>
 
           @if (error) {
@@ -90,12 +106,20 @@ import { AuthService } from '../services/auth.service';
       @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500;
     }
 
+    .remember-me {
+      @apply flex items-center;
+    }
+
+    .checkbox-input {
+      @apply h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-2;
+    }
+
     .btn-primary {
       @apply w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed;
     }
 
     .error-message {
-      @apply text-red-600 text-sm mb-4;
+      @apply text-red-600 text-sm mb-4 p-3 bg-red-50 rounded-md;
     }
 
     .login-footer {
@@ -107,21 +131,38 @@ import { AuthService } from '../services/auth.service';
     }
   `]
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   credentials = {
     username: '',
     password: ''
   };
+  rememberMe = true;
   loading = false;
   error = '';
   returnUrl = '/projects';
 
   constructor(
     private authService: AuthService,
+    private sessionService: SessionService,
     private router: Router,
     private route: ActivatedRoute
-  ) {
+  ) {}
+
+  ngOnInit() {
+    // Get return URL from route parameters or default to /projects
     this.returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/projects';
+
+    // Check if already logged in
+    if (this.authService.isAuthenticated()) {
+      this.router.navigate([this.returnUrl]);
+    }
+
+    // Check for stored credentials if remember me was selected
+    const storedUsername = localStorage.getItem('flutter_builder_remembered_username');
+    if (storedUsername) {
+      this.credentials.username = storedUsername;
+      this.rememberMe = true;
+    }
   }
 
   onSubmit() {
@@ -129,11 +170,25 @@ export class LoginComponent {
     this.error = '';
 
     this.authService.login(this.credentials.username, this.credentials.password).subscribe({
-      next: () => {
+      next: (response) => {
+        // Handle remember me
+        if (this.rememberMe) {
+          localStorage.setItem('flutter_builder_remembered_username', this.credentials.username);
+        } else {
+          localStorage.removeItem('flutter_builder_remembered_username');
+        }
+
+        // Start session
+        if (response.user) {
+          this.sessionService.startSession(response.user.id);
+        }
+
+        // Navigate to return URL
         this.router.navigate([this.returnUrl]);
       },
       error: (error) => {
-        this.error = error.error?.detail || 'Invalid username or password';
+        console.error('Login error:', error);
+        this.error = error.error?.detail || error.error?.message || 'Invalid username or password';
         this.loading = false;
       }
     });
