@@ -2,7 +2,6 @@
 
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { CdkDropList, CdkDragDrop } from '@angular/cdk/drag-drop';
 import {
   FlutterWidget,
   WidgetType,
@@ -16,7 +15,7 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
 @Component({
   selector: 'app-widget-renderer',
   standalone: true,
-  imports: [CommonModule, CdkDropList],
+  imports: [CommonModule],
   template: `
     <div
       [ngClass]="getWidgetClasses()"
@@ -24,19 +23,21 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
       (click)="handleClick($event)"
       [class.widget-selected]="isSelected"
       [class.widget-hoverable]="true"
-      [class.can-accept-children]="canAcceptChildren">
+      [class.can-accept-children]="canAcceptChildren"
+      [draggable]="!isRootWidget"
+      (dragstart)="onDragStart($event)"
+      (dragend)="onDragEnd($event)"
+      [class.dragging]="isDragging">
 
       @switch (widget.type) {
         <!-- Container Widget -->
         @case (WidgetType.CONTAINER) {
           <div
             class="widget-drop-zone"
-            cdkDropList
-            [cdkDropListData]="widget"
-            [id]="'drop-' + widget.id"
-            (cdkDropListDropped)="onDrop($event)"
-            [cdkDropListEnterPredicate]="canDropPredicate"
-            [class.drop-zone-active]="isDropTarget">
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
               @for (child of widget.children; track child.id; let i = $index) {
@@ -73,13 +74,10 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
           <div
             class="flutter-column widget-drop-zone"
             [ngStyle]="getFlexContainerStyles()"
-            cdkDropList
-            [cdkDropListData]="widget"
-            [id]="'drop-' + widget.id"
-            [cdkDropListOrientation]="'vertical'"
-            (cdkDropListDropped)="onDrop($event)"
-            [cdkDropListEnterPredicate]="canDropPredicate"
-            [class.drop-zone-active]="isDropTarget">
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
               @for (child of widget.children; track child.id; let i = $index) {
@@ -111,13 +109,10 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
           <div
             class="flutter-row widget-drop-zone"
             [ngStyle]="getFlexContainerStyles()"
-            cdkDropList
-            [cdkDropListData]="widget"
-            [id]="'drop-' + widget.id"
-            [cdkDropListOrientation]="'horizontal'"
-            (cdkDropListDropped)="onDrop($event)"
-            [cdkDropListEnterPredicate]="canDropPredicate"
-            [class.drop-zone-active]="isDropTarget">
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
               @for (child of widget.children; track child.id; let i = $index) {
@@ -148,12 +143,10 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
         @case (WidgetType.STACK) {
           <div
             class="relative w-full h-full min-h-[100px] widget-drop-zone"
-            cdkDropList
-            [cdkDropListData]="widget"
-            [id]="'drop-' + widget.id"
-            (cdkDropListDropped)="onDrop($event)"
-            [cdkDropListEnterPredicate]="canDropPredicate"
-            [class.drop-zone-active]="isDropTarget">
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
               @for (child of widget.children; track child.id) {
@@ -179,12 +172,10 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
           <div
             [ngStyle]="getPaddingStyles()"
             class="widget-drop-zone"
-            cdkDropList
-            [cdkDropListData]="widget"
-            [id]="'drop-' + widget.id"
-            (cdkDropListDropped)="onDrop($event)"
-            [cdkDropListEnterPredicate]="canDropPredicate"
-            [class.drop-zone-active]="isDropTarget">
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
               @for (child of widget.children; track child.id) {
@@ -207,12 +198,10 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
         @case (WidgetType.CENTER) {
           <div
             class="flex items-center justify-center w-full h-full widget-drop-zone"
-            cdkDropList
-            [cdkDropListData]="widget"
-            [id]="'drop-' + widget.id"
-            (cdkDropListDropped)="onDrop($event)"
-            [cdkDropListEnterPredicate]="canDropPredicate"
-            [class.drop-zone-active]="isDropTarget">
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
               @for (child of widget.children; track child.id) {
@@ -236,12 +225,10 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
           <div
             [ngStyle]="getSizedBoxStyles()"
             class="widget-drop-zone"
-            cdkDropList
-            [cdkDropListData]="widget"
-            [id]="'drop-' + widget.id"
-            (cdkDropListDropped)="onDrop($event)"
-            [cdkDropListEnterPredicate]="canDropPredicate"
-            [class.drop-zone-active]="isDropTarget">
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
               @for (child of widget.children; track child.id) {
@@ -264,12 +251,10 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
         @case (WidgetType.SCAFFOLD) {
           <div
             class="w-full h-full bg-white widget-drop-zone"
-            cdkDropList
-            [cdkDropListData]="widget"
-            [id]="'drop-' + widget.id"
-            (cdkDropListDropped)="onDrop($event)"
-            [cdkDropListEnterPredicate]="canDropPredicate"
-            [class.drop-zone-active]="isDropTarget">
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drop-zone-active]="isDragOver">
 
             @for (child of widget.children; track child.id) {
               <app-widget-renderer
@@ -307,8 +292,24 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
       @apply transition-all duration-200 cursor-pointer relative;
     }
 
-    .widget-hoverable:hover {
+    .widget-hoverable:hover:not(.dragging) {
       @apply outline outline-2 outline-blue-300 outline-offset-2;
+    }
+
+    .dragging {
+      @apply opacity-50 cursor-move;
+    }
+
+    /* Prevent text selection while dragging */
+    [draggable="true"] {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+
+    [draggable="true"]:not(.dragging) {
+      @apply cursor-move;
     }
 
     .widget-selected {
@@ -382,19 +383,6 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
     .drop-indicator-vertical.show {
       @apply opacity-100;
     }
-
-    /* CDK Drop List styles */
-    .cdk-drop-list-dragging {
-      @apply cursor-move;
-    }
-
-    .cdk-drag-placeholder {
-      @apply opacity-50;
-    }
-
-    .cdk-drag-animating {
-    @apply transition-transform duration-200;
-    }
   `]
 })
 export class WidgetRendererComponent implements OnInit, OnChanges {
@@ -408,6 +396,12 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
   canAcceptChildren = false;
   isDropTarget = false;
   dropIndicatorIndex: number | null = null;
+  isDragOver = false;
+  isDragging = false;
+
+  get isRootWidget(): boolean {
+    return !this.parentWidget;
+  }
 
   constructor(
     private canvasState: CanvasStateService,
@@ -444,37 +438,149 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
     this.widgetClick.emit(widgetId);
   }
 
-  canDropPredicate = (drag: any): boolean => {
-    const dragData = drag.data as DragData;
-    return this.canvasState.canDropWidget(dragData, this.widget.id, this.widget);
+  onDragOver(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer!.dropEffect = 'copy';
+
+    // Check if this widget can accept children
+    if (this.canAcceptChildren) {
+      this.isDragOver = true;
+    }
   }
 
-  onDrop(event: CdkDragDrop<any>) {
-  // Remove the stopPropagation line - it's not needed
-  const dragData = event.item.data as DragData;
-  const dropWidget = event.container.data as FlutterWidget;
+  onDragLeave(event: DragEvent) {
+    event.stopPropagation();
+    this.isDragOver = false;
+  }
 
-  console.log('Drop event:', dragData, 'on', dropWidget.type);
+  onDrop(event: DragEvent) {
+  event.preventDefault();
+  event.stopPropagation();
 
-  // Calculate drop index based on position
-  const dropIndex = event.currentIndex || dropWidget.children.length;
+  this.isDragOver = false;
 
-  if (dragData.type === 'new-widget' && dragData.widgetType) {
-    // Add new widget
-    this.canvasState.addWidgetAtDropPosition(
-      dragData.widgetType,
-      dropWidget.id,
-      dropIndex
-    );
-  } else if (dragData.type === 'existing-widget' && dragData.widgetId) {
-    // Move existing widget
-    this.canvasState.moveWidget(
-      dragData.widgetId,
-      dropWidget.id,
-      dropIndex
-    );
+  try {
+    const dataText = event.dataTransfer!.getData('application/json');
+    if (!dataText) return;
+
+    const dragData = JSON.parse(dataText) as DragData;
+
+    console.log('Drop event:', dragData, 'on', this.widget.type);
+
+    // Calculate drop index based on mouse position
+    const dropIndex = this.calculateDropIndex(event);
+
+    if (dragData.type === 'new-widget' && dragData.widgetType) {
+      // Add new widget at calculated position
+      this.canvasState.addWidgetAtDropPosition(
+        dragData.widgetType,
+        this.widget.id,
+        dropIndex
+      );
+    } else if (dragData.type === 'existing-widget' && dragData.widgetId) {
+      // Don't allow dropping on self or descendants
+      if (dragData.widgetId === this.widget.id) {
+        return;
+      }
+
+      // Check if we're trying to drop a parent into its child
+      if (this.isDescendantOf(dragData.widgetId)) {
+        console.warn('Cannot drop parent into its own child');
+        return;
+      }
+
+      // Move existing widget
+      this.canvasState.moveWidget(
+        dragData.widgetId,
+        this.widget.id,
+        dropIndex
+      );
+    }
+  } catch (error) {
+    console.error('Error handling drop:', error);
   }
 }
+private calculateDropIndex(event: DragEvent): number {
+  // For Row widgets, calculate based on X position
+  if (this.widget.type === WidgetType.ROW) {
+    const container = event.currentTarget as HTMLElement;
+    const children = Array.from(container.querySelectorAll(':scope > .child-wrapper-horizontal'));
+
+    for (let i = 0; i < children.length; i++) {
+      const rect = children[i].getBoundingClientRect();
+      if (event.clientX < rect.left + rect.width / 2) {
+        return i;
+      }
+    }
+    return this.widget.children.length;
+  }
+
+  // For Column and other vertical layouts, calculate based on Y position
+  const container = event.currentTarget as HTMLElement;
+  const children = Array.from(container.querySelectorAll(':scope > .child-wrapper'));
+
+  for (let i = 0; i < children.length; i++) {
+    const rect = children[i].getBoundingClientRect();
+    if (event.clientY < rect.top + rect.height / 2) {
+      return i;
+    }
+  }
+
+  return this.widget.children.length;
+}
+
+private isDescendantOf(ancestorId: string): boolean {
+  let current = this.parentWidget;
+  while (current) {
+    if (current.id === ancestorId) {
+      return true;
+    }
+    current = this.canvasState.findWidget(current.parent || '') || null;
+  }
+  return false;
+}
+
+
+  onDragStart(event: DragEvent) {
+    // Don't start drag if clicking on an empty container
+    if ((event.target as HTMLElement).classList.contains('empty-container') ||
+        (event.target as HTMLElement).classList.contains('empty-layout')) {
+      event.preventDefault();
+      return;
+    }
+
+    event.stopPropagation();
+
+    // Create drag data for existing widget
+    const dragData: DragData = {
+      type: 'existing-widget',
+      widgetId: this.widget.id,
+      sourceData: this.widget
+    };
+
+    event.dataTransfer!.effectAllowed = 'move';
+    event.dataTransfer!.setData('application/json', JSON.stringify(dragData));
+
+    // Add visual feedback
+    this.isDragging = true;
+    this.canvasState.setDragging(true);
+
+    // Create a custom drag image
+    const dragImage = (event.target as HTMLElement).cloneNode(true) as HTMLElement;
+    dragImage.style.opacity = '0.5';
+    dragImage.style.position = 'absolute';
+    dragImage.style.top = '-1000px';
+    document.body.appendChild(dragImage);
+    event.dataTransfer!.setDragImage(dragImage, event.offsetX, event.offsetY);
+    setTimeout(() => document.body.removeChild(dragImage), 0);
+  }
+
+  onDragEnd(event: DragEvent) {
+    event.stopPropagation();
+    this.isDragging = false;
+    this.canvasState.setDragging(false);
+  }
 
   showDropIndicator(index: number): boolean {
     return this.isDropTarget && this.dropIndicatorIndex === index;
@@ -489,8 +595,6 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
       zIndex: index
     };
   }
-
-  // ... Rest of the styling methods remain the same ...
 
   getWidgetClasses(): string[] {
     const classes = ['flutter-widget'];

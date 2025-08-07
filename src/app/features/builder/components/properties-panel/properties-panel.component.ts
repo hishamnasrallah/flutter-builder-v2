@@ -108,7 +108,7 @@ import { AlignmentPickerComponent } from '../property-editors/alignment-picker.c
                             [value]="getPropertyValue(property.key)"
                             [min]="property.min"
                             [max]="property.max"
-                            [step]="property.step"
+                            [step]="property.step || 1"
                             [unit]="property.unit"
                             (valueChange)="onPropertyChange(property.key, $event)">
                           </app-number-input>

@@ -18,7 +18,7 @@ import { WidgetTreeComponent } from './components/widget-tree/widget-tree.compon
     DragDropModule
   ],
   template: `
-    <div class="builder-container" cdkDropListGroup>
+    <div class="builder-container">
       <!-- Header -->
       <header class="builder-header">
         <div class="flex items-center gap-4">

@@ -3,7 +3,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { CdkDrag, CdkDragPreview } from '@angular/cdk/drag-drop';
+import {CdkDrag, CdkDragPreview, CdkDropList} from '@angular/cdk/drag-drop';
 import {
   WidgetDefinition,
   WidgetCategory,
@@ -22,7 +22,7 @@ interface CategoryGroup {
 @Component({
   selector: 'app-widget-palette',
   standalone: true,
-  imports: [CommonModule, FormsModule, CdkDrag, CdkDragPreview],
+  imports: [CommonModule, FormsModule, CdkDrag, CdkDragPreview, CdkDropList],
   template: `
     <div class="widget-palette">
       <div class="palette-header">
@@ -66,17 +66,10 @@ interface CategoryGroup {
               <div class="category-widgets">
                 @for (widget of group.widgets; track widget.type) {
                   <div
-                    cdkDrag
-                    [cdkDragData]="createDragData(widget)"
                     class="widget-item"
-                    (cdkDragStarted)="onDragStart(widget)"
-                    (cdkDragEnded)="onDragEnd()">
-
-                    <!-- Custom drag preview -->
-                    <div *cdkDragPreview class="widget-drag-preview">
-                      <div class="preview-icon">{{ widget.icon }}</div>
-                      <div class="preview-name">{{ widget.displayName }}</div>
-                    </div>
+                    draggable="true"
+                    (dragstart)="onNativeDragStart($event, widget)"
+                    (dragend)="onNativeDragEnd($event)">
 
                     <!-- Widget display in palette -->
                     <div class="widget-icon">{{ widget.icon }}</div>
@@ -152,11 +145,19 @@ interface CategoryGroup {
     }
 
     .widget-item {
-      @apply flex items-center gap-3 p-3 mb-1 bg-white rounded-lg border border-gray-200 cursor-move hover:border-blue-300 hover:shadow-sm transition-all;
+      @apply flex items-center gap-3 p-3 mb-1 bg-white rounded-lg border border-gray-200 cursor-copy hover:border-blue-300 hover:shadow-sm transition-all relative;
     }
 
-    .widget-item.cdk-drag-preview {
-      @apply opacity-0;
+    .widget-item::after {
+      content: '+';
+      @apply absolute -top-1 -right-1 w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold opacity-0 transition-opacity;
+    }
+
+    .widget-item:hover::after {
+      @apply opacity-100;
+    }
+    .widget-item.dragging {
+      @apply opacity-50;
     }
 
     .widget-item.cdk-drag-animating {
@@ -284,22 +285,28 @@ export class WidgetPaletteComponent implements OnInit {
     };
   }
 
-  onDragStart(widget: WidgetDefinition): void {
+  onNativeDragStart(event: DragEvent, widget: WidgetDefinition): void {
     console.log('Started dragging widget:', widget.displayName);
-    this.canvasState.setDragging(true);
 
-    // Create a preview widget for visual feedback
-    const previewWidget = this.widgetRegistry.createWidget(widget.type);
-    this.canvasState.updateDragPreview({
-      x: 0,
-      y: 0,
-      widget: previewWidget
-    });
+    // Store widget data in dataTransfer
+    const dragData = this.createDragData(widget);
+    event.dataTransfer!.effectAllowed = 'copy';
+    event.dataTransfer!.setData('application/json', JSON.stringify(dragData));
+
+    // Add visual feedback
+    const element = event.target as HTMLElement;
+    element.classList.add('dragging');
+
+    this.canvasState.setDragging(true);
   }
 
-  onDragEnd(): void {
+  onNativeDragEnd(event: DragEvent): void {
     console.log('Drag ended');
+
+    // Remove visual feedback
+    const element = event.target as HTMLElement;
+    element.classList.remove('dragging');
+
     this.canvasState.setDragging(false);
-    this.canvasState.updateDragPreview(null);
   }
 }

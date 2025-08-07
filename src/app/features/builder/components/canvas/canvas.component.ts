@@ -88,12 +88,10 @@ import { Subject, takeUntil } from 'rxjs';
         <div class="device-frame">
           <div
             class="device-screen"
-            cdkDropList
-            [cdkDropListData]="null"
-            [id]="'drop-root'"
-            (cdkDropListDropped)="onRootDrop($event)"
-            [cdkDropListEnterPredicate]="canDropOnRoot"
-            [class.drag-over]="isDragging && !rootWidget">
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drag-over]="isDragOver && !rootWidget">
 
             @if (rootWidget) {
               <app-widget-renderer
@@ -275,6 +273,10 @@ export class CanvasComponent implements OnInit, OnDestroy {
     private treeService: WidgetTreeService
   ) {}
 
+  getConnectedLists(): string[] {
+    // Connect to all palette lists
+    return ['palette-Layout', 'palette-Basic', 'palette-Material', 'palette-Form', 'palette-Navigation'];
+  }
   ngOnInit() {
     // Subscribe to canvas state changes
     this.canvasState.state$
@@ -326,17 +328,46 @@ export class CanvasComponent implements OnInit, OnDestroy {
     });
   }
 
-  canDropOnRoot = (drag: any): boolean => {
-    const dragData = drag.data as DragData;
-    return !this.rootWidget && dragData.type === 'new-widget';
+  isDragOver = false;
+
+  onDragOver(event: DragEvent) {
+    event.preventDefault();
+    event.dataTransfer!.dropEffect = 'copy';
+
+    if (!this.rootWidget) {
+      this.isDragOver = true;
+    }
   }
 
-  onRootDrop(event: CdkDragDrop<any>) {
-    const dragData = event.item.data as DragData;
+  onDragLeave(event: DragEvent) {
+    // Check if we're actually leaving the drop zone
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = event.clientX;
+    const y = event.clientY;
 
-    if (!this.rootWidget && dragData.type === 'new-widget' && dragData.widgetType) {
-      // Add as root widget
-      this.canvasState.addWidget(dragData.widgetType, null);
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+      this.isDragOver = false;
+    }
+  }
+
+  onDrop(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.isDragOver = false;
+
+    try {
+      const dataText = event.dataTransfer!.getData('application/json');
+      if (!dataText) return;
+
+      const dragData = JSON.parse(dataText) as DragData;
+
+      if (!this.rootWidget && dragData.type === 'new-widget' && dragData.widgetType) {
+        // Add as root widget
+        this.canvasState.addWidget(dragData.widgetType, null);
+      }
+    } catch (error) {
+      console.error('Error handling drop:', error);
     }
   }
 
