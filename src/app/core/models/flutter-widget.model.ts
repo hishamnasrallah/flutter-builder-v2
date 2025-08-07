@@ -89,6 +89,26 @@ export interface WidgetProperties {
   title?: string;
   backgroundColor?: string;
   elevation?: number;
+
+  // Card properties
+  borderRadius?: number;
+
+  // Icon properties
+  icon?: string;
+  size?: number;
+
+  // ListView properties
+  scrollDirection?: 'vertical' | 'horizontal';
+  separatorHeight?: number;
+
+  // Expanded properties
+  flex?: number;
+
+  // TextField properties
+  hintText?: string;
+  borderColor?: string;
+  borderWidth?: number;
+  autofocus?: boolean;
 }
 
 export interface EdgeInsets {
