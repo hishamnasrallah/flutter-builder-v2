@@ -1,0 +1,305 @@
+// src/app/features/builder/components/widget-palette/widget-palette.component.ts
+
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { CdkDrag, CdkDragPreview } from '@angular/cdk/drag-drop';
+import {
+  WidgetDefinition,
+  WidgetCategory,
+  WidgetType
+} from '../../../../core/models/flutter-widget.model';
+import { WidgetRegistryService } from '../../../../core/services/widget-registry.service';
+import { CanvasStateService, DragData } from '../../../../core/services/canvas-state.service';
+
+interface CategoryGroup {
+  category: WidgetCategory;
+  displayName: string;
+  widgets: WidgetDefinition[];
+  isExpanded: boolean;
+}
+
+@Component({
+  selector: 'app-widget-palette',
+  standalone: true,
+  imports: [CommonModule, FormsModule, CdkDrag, CdkDragPreview],
+  template: `
+    <div class="widget-palette">
+      <div class="palette-header">
+        <h3 class="text-sm font-semibold text-gray-700">Widget Library</h3>
+        <button
+          class="text-xs text-blue-600 hover:text-blue-700"
+          (click)="expandAll()">
+          Expand All
+        </button>
+      </div>
+
+      <div class="palette-search">
+        <input
+          type="text"
+          placeholder="Search widgets..."
+          [(ngModel)]="searchTerm"
+          (input)="filterWidgets()"
+          class="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500">
+      </div>
+
+      <div class="palette-categories">
+        @for (group of filteredGroups; track group.category) {
+          <div class="category-group">
+            <button
+              class="category-header"
+              (click)="toggleCategory(group)"
+              [class.expanded]="group.isExpanded">
+              <svg
+                class="w-3 h-3 transition-transform"
+                [class.rotate-90]="group.isExpanded"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+              <span class="category-name">{{ group.displayName }}</span>
+              <span class="category-count">{{ group.widgets.length }}</span>
+            </button>
+
+            @if (group.isExpanded) {
+              <div class="category-widgets">
+                @for (widget of group.widgets; track widget.type) {
+                  <div
+                    cdkDrag
+                    [cdkDragData]="createDragData(widget)"
+                    class="widget-item"
+                    (cdkDragStarted)="onDragStart(widget)"
+                    (cdkDragEnded)="onDragEnd()">
+
+                    <!-- Custom drag preview -->
+                    <div *cdkDragPreview class="widget-drag-preview">
+                      <div class="preview-icon">{{ widget.icon }}</div>
+                      <div class="preview-name">{{ widget.displayName }}</div>
+                    </div>
+
+                    <!-- Widget display in palette -->
+                    <div class="widget-icon">{{ widget.icon }}</div>
+                    <div class="widget-info">
+                      <div class="widget-name">{{ widget.displayName }}</div>
+                      <div class="widget-type">{{ widget.type }}</div>
+                    </div>
+                    <div class="widget-drag-handle">
+                      <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z">
+                        </path>
+                      </svg>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      @if (filteredGroups.length === 0 && searchTerm) {
+        <div class="no-results">
+          <svg class="w-12 h-12 text-gray-300 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+          <p class="text-sm text-gray-500 mt-2">No widgets found for "{{ searchTerm }}"</p>
+        </div>
+      }
+    </div>
+  `,
+  styles: [`
+    .widget-palette {
+      @apply h-full flex flex-col bg-white;
+    }
+
+    .palette-header {
+      @apply flex items-center justify-between px-4 py-3 border-b border-gray-200;
+    }
+
+    .palette-search {
+      @apply px-4 py-3 border-b border-gray-200;
+    }
+
+    .palette-categories {
+      @apply flex-1 overflow-y-auto;
+    }
+
+    .category-group {
+      @apply border-b border-gray-100;
+    }
+
+    .category-header {
+      @apply w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors;
+    }
+
+    .category-header.expanded {
+      @apply bg-gray-50;
+    }
+
+    .category-name {
+      @apply flex-1 text-sm font-medium text-gray-700;
+    }
+
+    .category-count {
+      @apply text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full;
+    }
+
+    .category-widgets {
+      @apply px-2 py-2 bg-gray-50;
+    }
+
+    .widget-item {
+      @apply flex items-center gap-3 p-3 mb-1 bg-white rounded-lg border border-gray-200 cursor-move hover:border-blue-300 hover:shadow-sm transition-all;
+    }
+
+    .widget-item.cdk-drag-preview {
+      @apply opacity-0;
+    }
+
+    .widget-item.cdk-drag-animating {
+      @apply transition-transform duration-200;
+    }
+
+    .widget-icon {
+      @apply w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded text-lg font-bold;
+    }
+
+    .widget-info {
+      @apply flex-1;
+    }
+
+    .widget-name {
+      @apply text-sm font-medium text-gray-800;
+    }
+
+    .widget-type {
+      @apply text-xs text-gray-500;
+    }
+
+    .widget-drag-handle {
+      @apply opacity-50 hover:opacity-100 transition-opacity;
+    }
+
+    .widget-drag-preview {
+      @apply flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg shadow-xl;
+    }
+
+    .preview-icon {
+      @apply text-lg font-bold;
+    }
+
+    .preview-name {
+      @apply text-sm font-medium;
+    }
+
+    .no-results {
+      @apply text-center py-8;
+    }
+
+    /* CDK Drag global styles */
+    :global(.cdk-drag-placeholder) {
+      @apply opacity-0;
+    }
+
+    :global(.cdk-drop-list-dragging) {
+      @apply cursor-move;
+    }
+  `]
+})
+export class WidgetPaletteComponent implements OnInit {
+  categoryGroups: CategoryGroup[] = [];
+  filteredGroups: CategoryGroup[] = [];
+  searchTerm: string = '';
+
+  constructor(
+    private widgetRegistry: WidgetRegistryService,
+    private canvasState: CanvasStateService
+  ) {}
+
+  ngOnInit() {
+    this.initializeCategories();
+  }
+
+  private initializeCategories(): void {
+    const categoryDisplayNames: Record<WidgetCategory, string> = {
+      [WidgetCategory.LAYOUT]: 'Layout',
+      [WidgetCategory.BASIC]: 'Basic',
+      [WidgetCategory.MATERIAL]: 'Material',
+      [WidgetCategory.FORM]: 'Forms',
+      [WidgetCategory.NAVIGATION]: 'Navigation'
+    };
+
+    // Get all categories and their widgets
+    const categories = Object.values(WidgetCategory);
+
+    this.categoryGroups = categories.map(category => ({
+      category,
+      displayName: categoryDisplayNames[category],
+      widgets: this.widgetRegistry.getWidgetsByCategory(category),
+      isExpanded: category === WidgetCategory.LAYOUT || category === WidgetCategory.BASIC // Default expand these
+    }));
+
+    // Filter out empty categories
+    this.categoryGroups = this.categoryGroups.filter(group => group.widgets.length > 0);
+    this.filteredGroups = [...this.categoryGroups];
+  }
+
+  toggleCategory(group: CategoryGroup): void {
+    group.isExpanded = !group.isExpanded;
+  }
+
+  expandAll(): void {
+    const allExpanded = this.categoryGroups.every(g => g.isExpanded);
+    this.categoryGroups.forEach(g => g.isExpanded = !allExpanded);
+  }
+
+  filterWidgets(): void {
+    if (!this.searchTerm.trim()) {
+      this.filteredGroups = [...this.categoryGroups];
+      return;
+    }
+
+    const searchLower = this.searchTerm.toLowerCase();
+
+    this.filteredGroups = this.categoryGroups
+      .map(group => ({
+        ...group,
+        widgets: group.widgets.filter(widget =>
+          widget.displayName.toLowerCase().includes(searchLower) ||
+          widget.type.toLowerCase().includes(searchLower)
+        ),
+        isExpanded: true // Auto-expand when searching
+      }))
+      .filter(group => group.widgets.length > 0);
+  }
+
+  createDragData(widget: WidgetDefinition): DragData {
+    return {
+      type: 'new-widget',
+      widgetType: widget.type,
+      sourceData: widget
+    };
+  }
+
+  onDragStart(widget: WidgetDefinition): void {
+    console.log('Started dragging widget:', widget.displayName);
+    this.canvasState.setDragging(true);
+
+    // Create a preview widget for visual feedback
+    const previewWidget = this.widgetRegistry.createWidget(widget.type);
+    this.canvasState.updateDragPreview({
+      x: 0,
+      y: 0,
+      widget: previewWidget
+    });
+  }
+
+  onDragEnd(): void {
+    console.log('Drag ended');
+    this.canvasState.setDragging(false);
+    this.canvasState.updateDragPreview(null);
+  }
+}
