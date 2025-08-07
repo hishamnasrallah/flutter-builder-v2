@@ -1,18 +1,18 @@
 // src/app/features/builder/components/widget-palette/widget-palette.component.ts
 
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import {Component, OnInit} from '@angular/core';
+import {CommonModule} from '@angular/common';
+import {FormsModule} from '@angular/forms';
 import {CdkDrag, CdkDragPreview, CdkDropList} from '@angular/cdk/drag-drop';
 import {
   WidgetDefinition,
   WidgetCategory,
   WidgetType
 } from '../../../../core/models/flutter-widget.model';
-import { WidgetRegistryService } from '../../../../core/services/widget-registry.service';
-import { CanvasStateService, DragData } from '../../../../core/services/canvas-state.service';
-import { ComponentTemplateService } from '../../../../core/services/component-template.service';
-import { NotificationService } from '../../../../core/services/notification.service';
+import {WidgetRegistryService} from '../../../../core/services/widget-registry.service';
+import {CanvasStateService, DragData} from '../../../../core/services/canvas-state.service';
+import {ComponentTemplateService} from '../../../../core/services/component-template.service';
+import {NotificationService} from '../../../../core/services/notification.service';
 
 interface ComponentTemplate {
   id: number;
@@ -78,7 +78,7 @@ interface CategoryGroup {
 
             @if (group.isExpanded) {
               <div class="category-widgets">
-                @for (widget of group.widgets; track widget.type) {
+                @for (widget of group.widgets; track $index) {
                   <div
                     class="widget-item"
                     draggable="true"
@@ -94,7 +94,7 @@ interface CategoryGroup {
                     <div class="widget-drag-handle">
                       <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z">
+                              d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z">
                         </path>
                       </svg>
                     </div>
@@ -110,7 +110,7 @@ interface CategoryGroup {
         <div class="no-results">
           <svg class="w-12 h-12 text-gray-300 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
           </svg>
           <p class="text-sm text-gray-500 mt-2">No widgets found for "{{ searchTerm }}"</p>
         </div>
@@ -170,6 +170,7 @@ interface CategoryGroup {
     .widget-item:hover::after {
       @apply opacity-100;
     }
+
     .widget-item.dragging {
       @apply opacity-50;
     }
@@ -234,7 +235,8 @@ export class WidgetPaletteComponent implements OnInit {
     private canvasState: CanvasStateService,
     private componentTemplateService: ComponentTemplateService,
     private notification: NotificationService
-  ) {}
+  ) {
+  }
 
   ngOnInit() {
     this.loadDynamicWidgets();

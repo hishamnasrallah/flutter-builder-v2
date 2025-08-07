@@ -1,6 +1,6 @@
 // src/app/features/builder/components/property-editors/spacing-editor.component.ts
 
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -42,7 +42,7 @@ interface SpacingValue {
             <label class="spacing-label">All</label>
             <input
               type="number"
-              [value]="value.top"
+              [value]="safeValue.top"
               (input)="onLinkedChange($event)"
               class="spacing-input">
           </div>
@@ -52,7 +52,7 @@ interface SpacingValue {
               <label class="spacing-label">T</label>
               <input
                 type="number"
-                [value]="value.top"
+                [value]="safeValue.top"
                 (input)="onValueChange('top', $event)"
                 class="spacing-input">
             </div>
@@ -60,7 +60,7 @@ interface SpacingValue {
               <label class="spacing-label">R</label>
               <input
                 type="number"
-                [value]="value.right"
+                [value]="safeValue.right"
                 (input)="onValueChange('right', $event)"
                 class="spacing-input">
             </div>
@@ -68,7 +68,7 @@ interface SpacingValue {
               <label class="spacing-label">B</label>
               <input
                 type="number"
-                [value]="value.bottom"
+                [value]="safeValue.bottom"
                 (input)="onValueChange('bottom', $event)"
                 class="spacing-input">
             </div>
@@ -76,7 +76,7 @@ interface SpacingValue {
               <label class="spacing-label">L</label>
               <input
                 type="number"
-                [value]="value.left"
+                [value]="safeValue.left"
                 (input)="onValueChange('left', $event)"
                 class="spacing-input">
             </div>
@@ -112,24 +112,33 @@ interface SpacingValue {
     }
   `]
 })
-export class SpacingEditorComponent {
+export class SpacingEditorComponent implements OnInit {
   @Input() value: SpacingValue = { top: 0, right: 0, bottom: 0, left: 0 };
   @Output() valueChange = new EventEmitter<SpacingValue>();
 
   isLinked = false;
 
+  get safeValue(): SpacingValue {
+    return this.value || { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+
   ngOnInit() {
+    // Ensure value is always an object before checking properties
+    if (!this.value) {
+      this.value = { top: 0, right: 0, bottom: 0, left: 0 };
+    }
     // Check if all values are the same (linked)
-    this.isLinked = this.value.top === this.value.right &&
-                   this.value.top === this.value.bottom &&
-                   this.value.top === this.value.left;
+    const safe = this.safeValue;
+    this.isLinked = safe.top === safe.right &&
+                   safe.top === safe.bottom &&
+                   safe.top === safe.left;
   }
 
   toggleLinked() {
     this.isLinked = !this.isLinked;
     if (this.isLinked) {
       // Set all values to top value
-      const linkedValue = this.value.top;
+      const linkedValue = this.safeValue.top;
       this.valueChange.emit({
         top: linkedValue,
         right: linkedValue,
@@ -152,8 +161,10 @@ export class SpacingEditorComponent {
   onValueChange(side: keyof SpacingValue, event: Event) {
     const value = parseInt((event.target as HTMLInputElement).value) || 0;
     this.valueChange.emit({
-      ...this.value,
+      ...this.safeValue,
       [side]: value
     });
   }
+
+
 }
