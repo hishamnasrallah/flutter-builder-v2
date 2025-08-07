@@ -1,0 +1,83 @@
+    .properties-panel {
+      @apply h-full flex flex-col bg-white;
+    }
+
+    .panel-header {
+      @apply flex items-center justify-between px-4 py-3 border-b border-gray-200;
+    }
+
+    .panel-content {
+      @apply flex-1 overflow-y-auto;
+    }
+
+    .widget-info-card {
+      @apply mx-4 mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200;
+    }
+
+    .widget-type-badge {
+      @apply flex items-center gap-2 mb-2;
+    }
+
+    .widget-icon {
+      @apply text-lg;
+    }
+
+    .widget-type {
+      @apply text-sm font-semibold text-gray-700;
+    }
+
+    .widget-id {
+      @apply flex items-center gap-2;
+    }
+
+    .property-category {
+      @apply border-b border-gray-100;
+    }
+
+    .category-header {
+      @apply w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors;
+    }
+
+    .category-header.expanded {
+      @apply bg-gray-50;
+    }
+
+    .category-icon {
+      @apply text-base;
+    }
+
+    .category-name {
+      @apply flex-1 text-sm font-medium text-gray-700;
+    }
+
+    .category-count {
+      @apply text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full;
+    }
+
+    .category-properties {
+      @apply px-4 py-3 bg-gray-50 space-y-4;
+    }
+
+    .property-item {
+      @apply space-y-2;
+    }
+
+    .property-header {
+      @apply flex items-center justify-between;
+    }
+
+    .property-label {
+      @apply text-xs font-medium text-gray-600;
+    }
+
+    .reset-btn {
+      @apply p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors;
+    }
+
+    .error-message {
+      @apply text-xs text-red-500 mt-1;
+    }
+
+    .no-selection {
+      @apply py-16 text-center;
+    }

@@ -1,0 +1,92 @@
+    .canvas-container {
+      @apply h-full flex flex-col bg-gray-50;
+    }
+
+    .canvas-header {
+      @apply flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200;
+    }
+
+    .canvas-viewport {
+      @apply flex-1 overflow-auto p-8 flex items-center justify-center;
+      background-image:
+        linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+        linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+        linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+
+    .canvas-viewport.dragging {
+      @apply bg-blue-50;
+    }
+
+    .device-frame {
+      @apply bg-gray-900 rounded-3xl p-3 shadow-2xl relative;
+      width: 390px;
+      height: 844px;
+      transform: scale(var(--zoom-level, 1));
+      transform-origin: center;
+      transition: transform 0.3s ease;
+    }
+
+    .device-screen {
+      @apply bg-white rounded-2xl w-full h-full overflow-auto relative;
+    }
+
+    .device-screen.drag-over {
+      @apply ring-4 ring-blue-400 ring-opacity-50;
+    }
+
+    .empty-canvas {
+      @apply h-full flex flex-col items-center justify-center transition-all;
+    }
+
+    .empty-canvas.highlight {
+      @apply bg-blue-50;
+    }
+
+    .drop-zone-indicator {
+      @apply text-center;
+    }
+
+    .canvas-footer {
+      @apply px-4 py-2 bg-white border-t border-gray-200;
+    }
+
+    .zoom-controls {
+      @apply flex items-center gap-2;
+    }
+
+    .zoom-btn {
+      @apply p-1 rounded hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    }
+
+    .zoom-btn:not(:disabled):hover {
+      @apply bg-gray-100;
+    }
+
+    .zoom-level {
+      @apply text-sm text-gray-600 min-w-[50px] text-center;
+    }
+
+    .icon-btn {
+      @apply p-1.5 rounded hover:bg-gray-100 transition-colors text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed;
+    }
+
+    .icon-btn:not(:disabled):hover {
+      @apply bg-gray-100 text-gray-800;
+    }
+
+    .widget-info {
+      @apply text-xs text-gray-500;
+    }
+
+    /* CDK Drop List styles */
+    :global(.cdk-drag-placeholder) {
+      @apply opacity-50;
+    }
+
+    :global(.cdk-drop-list-dragging .cdk-drag) {
+      @apply transition-transform;
+    }

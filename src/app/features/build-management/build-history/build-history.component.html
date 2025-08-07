@@ -1,0 +1,104 @@
+    <div class="build-history">
+      <div class="history-header">
+        <h3 class="text-lg font-semibold">Build History</h3>
+        <button
+          class="refresh-btn"
+          (click)="loadBuilds()"
+          [disabled]="loading">
+          <svg class="w-4 h-4" [class.animate-spin]="loading" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+            </path>
+          </svg>
+          Refresh
+        </button>
+      </div>
+
+      <div class="builds-list">
+        @if (loading && builds.length === 0) {
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading build history...</p>
+          </div>
+        } @else if (builds.length === 0) {
+          <div class="empty-state">
+            <p class="text-gray-500">No builds yet</p>
+          </div>
+        } @else {
+          @for (build of builds; track build.id) {
+            <div class="build-item" [class.building]="build.status === 'building'">
+              <div class="build-status">
+                <span class="status-badge" [class]="'status-' + build.status">
+                  {{ build.status }}
+                </span>
+              </div>
+
+              <div class="build-info">
+                <div class="build-title">
+                  <span class="font-medium">Build #{{ build.id }}</span>
+                  <span class="text-sm text-gray-500">{{ build.build_type }}</span>
+                </div>
+                <div class="build-meta">
+                  <span class="text-xs text-gray-500">
+                    v{{ build.version_number }} ({{ build.build_number }})
+                  </span>
+                  <span class="text-xs text-gray-500">
+                    {{ formatDate(build.created_at) }}
+                  </span>
+                </div>
+                @if (build.error_message) {
+                  <div class="error-message">
+                    {{ build.error_message }}
+                  </div>
+                }
+              </div>
+
+              <div class="build-actions">
+                @if (build.status === 'building' || build.status === 'pending') {
+                  <button
+                    class="action-btn"
+                    (click)="viewLogs(build)"
+                    title="View Logs">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                      </path>
+                    </svg>
+                  </button>
+                  <button
+                    class="action-btn text-red-600"
+                    (click)="cancelBuild(build)"
+                    title="Cancel Build">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12">
+                      </path>
+                    </svg>
+                  </button>
+                } @else if (build.status === 'success' && build.apk_url) {
+                  <button
+                    class="action-btn text-green-600"
+                    (click)="downloadApk(build)"
+                    title="Download APK">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10">
+                      </path>
+                    </svg>
+                  </button>
+                  <span class="text-xs text-gray-500">
+                    {{ formatFileSize(build.apk_size) }}
+                  </span>
+                }
+
+                @if (build.duration_seconds) {
+                  <span class="text-xs text-gray-500">
+                    {{ formatDuration(build.duration_seconds) }}
+                  </span>
+                }
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>

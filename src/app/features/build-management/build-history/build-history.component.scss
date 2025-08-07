@@ -1,0 +1,65 @@
+    .build-history {
+      @apply bg-white rounded-lg shadow-sm p-4 min-h-screen;
+    }
+
+    .history-header {
+      @apply flex items-center justify-between mb-4;
+    }
+
+    .refresh-btn {
+      @apply flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors;
+    }
+
+    .builds-list {
+      @apply space-y-2;
+    }
+
+    .build-item {
+      @apply flex items-center gap-4 p-3 bg-gray-50 rounded-lg;
+    }
+
+    .build-item.building {
+      @apply animate-pulse;
+    }
+
+    .status-badge {
+      @apply px-2 py-1 text-xs font-medium rounded;
+    }
+
+    .status-pending { @apply bg-yellow-100 text-yellow-800; }
+    .status-building { @apply bg-blue-100 text-blue-800; }
+    .status-success { @apply bg-green-100 text-green-800; }
+    .status-failed { @apply bg-red-100 text-red-800; }
+    .status-cancelled { @apply bg-gray-100 text-gray-800; }
+
+    .build-info {
+      @apply flex-1;
+    }
+
+    .build-title {
+      @apply flex items-center gap-2;
+    }
+
+    .build-meta {
+      @apply flex items-center gap-4 mt-1;
+    }
+
+    .error-message {
+      @apply text-xs text-red-600 mt-2;
+    }
+
+    .build-actions {
+      @apply flex items-center gap-2;
+    }
+
+    .action-btn {
+      @apply p-1.5 hover:bg-gray-200 rounded transition-colors;
+    }
+
+    .loading-state, .empty-state {
+      @apply text-center py-8;
+    }
+
+    .spinner {
+      @apply w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin mx-auto;
+    }
