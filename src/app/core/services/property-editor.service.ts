@@ -16,6 +16,7 @@ import {
 } from '../models/flutter-widget.model';
 import { CanvasStateService } from './canvas-state.service';
 import { WidgetTreeService } from './widget-tree.service';
+import { NotificationService } from './notification.service';
 
 export interface PropertyDefinition {
   key: string;
@@ -56,7 +57,8 @@ export class PropertyEditorService {
 
   constructor(
     private canvasState: CanvasStateService,
-    private treeService: WidgetTreeService
+    private treeService: WidgetTreeService,
+    private notification: NotificationService
   ) {
     this.initializePropertySchemas();
     this.subscribeToSelection();
@@ -455,20 +457,28 @@ export class PropertyEditorService {
   }
 
   updateProperty(widgetId: string, propertyPath: string, value: any): void {
-    const widget = this.canvasState.findWidget(widgetId);
-    if (!widget) return;
+    try {
+      const widget = this.canvasState.findWidget(widgetId);
+      if (!widget) {
+        this.notification.showError('Widget not found');
+        return;
+      }
 
-    // Deep clone the widget
-    const updatedWidget = JSON.parse(JSON.stringify(widget));
+      // Deep clone the widget
+      const updatedWidget = JSON.parse(JSON.stringify(widget));
 
-    // Update the property using path (e.g., "decoration.border.width")
-    this.setNestedProperty(updatedWidget.properties, propertyPath, value);
+      // Update the property using path (e.g., "decoration.border.width")
+      this.setNestedProperty(updatedWidget.properties, propertyPath, value);
 
-    // Update the widget tree
-    const currentRoot = this.canvasState.currentState.rootWidget;
-    if (currentRoot) {
-      const updatedRoot = this.updateWidgetInTree(currentRoot, widgetId, updatedWidget);
-      this.canvasState.updateState({ rootWidget: updatedRoot });
+      // Update the widget tree
+      const currentRoot = this.canvasState.currentState.rootWidget;
+      if (currentRoot) {
+        const updatedRoot = this.updateWidgetInTree(currentRoot, widgetId, updatedWidget);
+        this.canvasState.updateState({ rootWidget: updatedRoot });
+      }
+    } catch (error) {
+      console.error('Failed to update property:', error);
+      this.notification.showError(`Failed to update property: ${propertyPath}`);
     }
   }
 

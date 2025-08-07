@@ -266,6 +266,7 @@ export class CanvasComponent implements OnInit, OnDestroy {
   canRedo = false;
 
   private destroy$ = new Subject<void>();
+  private keyboardListener: ((event: KeyboardEvent) => void) | null = null;
 
   constructor(
     private widgetRegistry: WidgetRegistryService,
@@ -306,10 +307,22 @@ export class CanvasComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+
+    // Remove keyboard listener to prevent memory leak
+    if (this.keyboardListener) {
+      document.removeEventListener('keydown', this.keyboardListener);
+      this.keyboardListener = null;
+    }
   }
 
   private setupKeyboardShortcuts() {
-    document.addEventListener('keydown', (event: KeyboardEvent) => {
+    this.keyboardListener = (event: KeyboardEvent) => {
+      // Ignore if typing in an input field
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+
       // Ctrl/Cmd + Z for undo
       if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
         event.preventDefault();
@@ -325,7 +338,9 @@ export class CanvasComponent implements OnInit, OnDestroy {
         event.preventDefault();
         this.deleteSelected();
       }
-    });
+    };
+
+    document.addEventListener('keydown', this.keyboardListener);
   }
 
   isDragOver = false;
@@ -372,7 +387,6 @@ export class CanvasComponent implements OnInit, OnDestroy {
   }
 
   onWidgetClick(widgetId: string) {
-    console.log('Widget clicked:', widgetId);
     this.canvasState.selectWidget(widgetId);
   }
 

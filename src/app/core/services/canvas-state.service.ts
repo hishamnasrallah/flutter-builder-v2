@@ -115,9 +115,6 @@ export class CanvasStateService {
           selectedWidgetId: newWidget.id
         });
         this.saveToHistory(updatedRoot);
-        console.log('Widget added:', newWidget.type, 'to parent:', parentId || 'root');
-      } else {
-        console.warn('Could not add widget:', widgetType, 'to parent:', parentId);
       }
     } catch (error) {
       console.error('Error adding widget:', error);
@@ -151,7 +148,6 @@ export class CanvasStateService {
     if (updatedRoot && updatedRoot !== this.currentState.rootWidget) {
       this.updateState({ rootWidget: updatedRoot });
       this.saveToHistory(updatedRoot);
-      console.log('Widget moved:', widgetId, 'to parent:', newParentId);
     }
   }
 

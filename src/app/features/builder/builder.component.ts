@@ -6,6 +6,7 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CanvasComponent } from './components/canvas/canvas.component';
 import { WidgetPaletteComponent } from './components/widget-palette/widget-palette.component';
 import { WidgetTreeComponent } from './components/widget-tree/widget-tree.component';
+import { PropertiesPanelComponent } from './components/properties-panel/properties-panel.component';
 
 @Component({
   selector: 'app-builder',
@@ -15,6 +16,7 @@ import { WidgetTreeComponent } from './components/widget-tree/widget-tree.compon
     CanvasComponent,
     WidgetPaletteComponent,
     WidgetTreeComponent,
+    PropertiesPanelComponent,
     DragDropModule
   ],
   template: `
@@ -23,7 +25,7 @@ import { WidgetTreeComponent } from './components/widget-tree/widget-tree.compon
       <header class="builder-header">
         <div class="flex items-center gap-4">
           <h1 class="text-xl font-semibold text-gray-800">Flutter UI Builder</h1>
-          <span class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded">Phase 3: Widget Hierarchy</span>
+          <span class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded">Phase 4: Properties Panel</span>
         </div>
         <div class="flex items-center gap-2">
           <button class="btn-secondary">
@@ -92,21 +94,9 @@ import { WidgetTreeComponent } from './components/widget-tree/widget-tree.compon
           <app-canvas></app-canvas>
         </main>
 
-        <!-- Right Sidebar - Properties (Placeholder for Phase 4) -->
+        <!-- Right Sidebar - Properties -->
         <aside class="builder-sidebar-right">
-          <div class="sidebar-header">
-            <h3 class="text-sm font-medium text-gray-700">Properties</h3>
-          </div>
-          <div class="sidebar-content">
-            <div class="text-center py-8 text-gray-400">
-              <svg class="w-12 h-12 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                  d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
-              </svg>
-              <p class="text-sm">Properties Panel</p>
-              <p class="text-xs mt-1">Coming in Phase 4</p>
-            </div>
-          </div>
+          <app-properties-panel></app-properties-panel>
         </aside>
       </div>
 
@@ -123,6 +113,7 @@ import { WidgetTreeComponent } from './components/widget-tree/widget-tree.compon
           <span class="text-xs text-green-600">✓ Phase 1: Static Display</span>
           <span class="text-xs text-green-600">✓ Phase 2: Drag & Drop</span>
           <span class="text-xs text-green-600">✓ Phase 3: Nesting & Tree</span>
+          <span class="text-xs text-green-600">✓ Phase 4: Properties Panel</span>
         </div>
       </footer>
     </div>

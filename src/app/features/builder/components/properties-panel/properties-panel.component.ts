@@ -12,6 +12,7 @@ import { SelectDropdownComponent } from '../property-editors/select-dropdown.com
 import { SpacingEditorComponent } from '../property-editors/spacing-editor.component';
 import { NumberInputComponent } from '../property-editors/number-input.component';
 import { AlignmentPickerComponent } from '../property-editors/alignment-picker.component';
+import { ToggleSwitchComponent } from '../property-editors/toggle-switch.component';
 
 @Component({
   selector: 'app-properties-panel',
@@ -24,7 +25,8 @@ import { AlignmentPickerComponent } from '../property-editors/alignment-picker.c
     SelectDropdownComponent,
     SpacingEditorComponent,
     NumberInputComponent,
-    AlignmentPickerComponent
+    AlignmentPickerComponent,
+    ToggleSwitchComponent
   ],
   template: `
     <div class="properties-panel">
@@ -77,9 +79,10 @@ import { AlignmentPickerComponent } from '../property-editors/alignment-picker.c
               @if (category.expanded) {
                 <div class="category-properties">
                   @for (property of category.properties; track property.key) {
-                    <div class="property-item">
-                      <div class="property-header">
-                        <label class="property-label">{{ property.label }}</label>
+                    @if (shouldShowProperty(property)) {
+                      <div class="property-item">
+                        <div class="property-header">
+                          <label class="property-label">{{ property.label }}</label>
                         @if (hasCustomValue(property)) {
                           <button
                             class="reset-btn"
@@ -93,6 +96,8 @@ import { AlignmentPickerComponent } from '../property-editors/alignment-picker.c
                           </button>
                         }
                       </div>
+                        </div>
+                    }
 
                       <!-- Property Editor based on type -->
                       @switch (property.type) {
@@ -138,6 +143,12 @@ import { AlignmentPickerComponent } from '../property-editors/alignment-picker.c
                             (valueChange)="onPropertyChange(property.key, $event)">
                           </app-alignment-picker>
                         }
+                        @case ('boolean') {
+                          <app-toggle-switch
+                            [value]="getPropertyValue(property.key)"
+                            (valueChange)="onPropertyChange(property.key, $event)">
+                          </app-toggle-switch>
+                        }
                       }
 
                       @if (getValidationError(property)) {
@@ -145,12 +156,18 @@ import { AlignmentPickerComponent } from '../property-editors/alignment-picker.c
                           {{ getValidationError(property) }}
                         </div>
                       }
-                    </div>
+
+
                   }
+
+
                 </div>
+
               }
+
             </div>
           }
+
         } @else {
           <!-- No Selection State -->
           <div class="no-selection">
@@ -344,5 +361,22 @@ export class PropertiesPanelComponent implements OnInit, OnDestroy {
       'AppBar': '━'
     };
     return icons[this.selectedWidget?.type || ''] || '?';
+  }
+
+shouldShowProperty(property: any): boolean {
+    if (!property.dependsOn || property.dependsOn.length === 0) {
+      return true;
+    }
+
+    // Check if all dependencies are met
+    for (const dependency of property.dependsOn) {
+      const value = this.getPropertyValue(dependency);
+      // Show property if dependency has a truthy value
+      if (!value || value === 0 || value === '') {
+        return false;
+      }
+    }
+
+    return true;
   }
 }

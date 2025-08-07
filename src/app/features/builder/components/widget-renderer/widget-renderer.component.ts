@@ -1,7 +1,8 @@
 // src/app/features/builder/components/widget-renderer/widget-renderer.component.ts
 
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+
 import {
   FlutterWidget,
   WidgetType,
@@ -466,7 +467,15 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
 
     const dragData = JSON.parse(dataText) as DragData;
 
-    console.log('Drop event:', dragData, 'on', this.widget.type);
+    // Check max children constraint
+    const maxChildren = this.widgetRegistry.getMaxChildren(this.widget.type);
+    if (maxChildren !== undefined && this.widget.children.length >= maxChildren) {
+      const notification = (window as any).notificationService;
+      if (notification) {
+        notification.showWarning(`${this.widget.type} can only have ${maxChildren} child widget(s)`);
+      }
+      return;
+    }
 
     // Calculate drop index based on mouse position
     const dropIndex = this.calculateDropIndex(event);

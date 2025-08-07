@@ -286,8 +286,6 @@ export class WidgetPaletteComponent implements OnInit {
   }
 
   onNativeDragStart(event: DragEvent, widget: WidgetDefinition): void {
-    console.log('Started dragging widget:', widget.displayName);
-
     // Store widget data in dataTransfer
     const dragData = this.createDragData(widget);
     event.dataTransfer!.effectAllowed = 'copy';
@@ -301,8 +299,6 @@ export class WidgetPaletteComponent implements OnInit {
   }
 
   onNativeDragEnd(event: DragEvent): void {
-    console.log('Drag ended');
-
     // Remove visual feedback
     const element = event.target as HTMLElement;
     element.classList.remove('dragging');
