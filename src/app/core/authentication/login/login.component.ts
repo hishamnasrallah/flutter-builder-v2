@@ -154,7 +154,7 @@ export class LoginComponent implements OnInit {
 
     // Check if already logged in
     if (this.authService.isAuthenticated()) {
-      this.router.navigate([this.returnUrl]);
+      this.router.navigateByUrl(this.returnUrl);
     }
 
     // Check for stored credentials if remember me was selected
@@ -184,7 +184,8 @@ export class LoginComponent implements OnInit {
         }
 
         // Navigate to return URL
-        this.router.navigate([this.returnUrl]);
+        this.router.navigateByUrl(this.returnUrl);
+
       },
       error: (error) => {
         console.error('Login error:', error);

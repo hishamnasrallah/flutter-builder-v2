@@ -1,7 +1,8 @@
 // src/app/core/services/canvas-state.service.ts
 
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
+import { tap, catchError } from 'rxjs/operators';
 import { FlutterWidget, WidgetType } from '../models/flutter-widget.model';
 import { WidgetRegistryService } from './widget-registry.service';
 import { WidgetTreeService } from './widget-tree.service';
@@ -54,10 +55,17 @@ export class CanvasStateService {
   private stateSubject = new BehaviorSubject<CanvasState>(this.initialState);
   public state$ = this.stateSubject.asObservable();
 
-  // History for undo/redo (preparing for future phases)
+  // History for undo/redo
   private history: FlutterWidget[] = [];
   private historyIndex = -1;
   private maxHistorySize = 50;
+
+  // Screen management properties
+  private currentScreenId: number | null = null;
+  private currentProjectId: number | null = null;
+  private autoSaveEnabled = true;
+  private lastSaveTime: Date | null = null;
+  private hasUnsavedChanges = false;
 
   constructor(
     private widgetRegistry: WidgetRegistryService,
@@ -67,48 +75,107 @@ export class CanvasStateService {
     // Initialize with sample widget tree for testing
     this.loadSampleWidgetTree();
   }
-// Add after the history properties
-private currentScreenId: number | null = null;
-private currentProjectId: number | null = null;
 
-// Add new methods
-loadScreen(screenId: number) {
-  this.currentScreenId = screenId;
-  this.screenService.getScreen(screenId).subscribe({
-    next: (screen) => {
-      this.updateState({
-        rootWidget: screen.ui_structure
-      });
-    },
-    error: (error) => {
-      console.error('Error loading screen:', error);
+  // Project management methods
+  setCurrentProject(projectId: number) {
+    this.currentProjectId = projectId;
+  }
+
+  getCurrentProject(): number | null {
+    return this.currentProjectId;
+  }
+
+  // Screen management methods
+  loadScreen(screenId: number) {
+    this.currentScreenId = screenId;
+
+    // Clear current state
+    this.updateState({
+      rootWidget: null,
+      selectedWidgetId: null,
+      hoveredWidgetId: null
+    });
+
+    this.screenService.getScreen(screenId).subscribe({
+      next: (screen) => {
+        // Load the UI structure
+        this.updateState({
+          rootWidget: screen.ui_structure || this.createEmptyRoot()
+        });
+
+        // Reset history for new screen
+        this.history = [screen.ui_structure || this.createEmptyRoot()];
+        this.historyIndex = 0;
+        this.hasUnsavedChanges = false;
+
+        console.log(`Loaded screen: ${screen.name}`);
+      },
+      error: (error) => {
+        console.error('Error loading screen:', error);
+        // Create empty root on error
+        this.updateState({
+          rootWidget: this.createEmptyRoot()
+        });
+      }
+    });
+  }
+
+  // Save current state to backend
+  saveToBackend(): Observable<any> {
+    if (!this.currentScreenId || !this.currentState.rootWidget) {
+      return of(null);
     }
-  });
-}
 
-saveToBackend() {
-  if (!this.currentScreenId || !this.currentState.rootWidget) return;
+    return this.screenService.updateUiStructure(
+      this.currentScreenId,
+      this.currentState.rootWidget
+    ).pipe(
+      tap(() => {
+        this.lastSaveTime = new Date();
+        this.hasUnsavedChanges = false;
+        console.log('Saved to backend at', this.lastSaveTime);
+      }),
+      catchError((error) => {
+        console.error('Error saving to backend:', error);
+        return throwError(() => error);
+      })
+    );
+  }
 
-  this.screenService.updateUiStructure(
-    this.currentScreenId,
-    this.currentState.rootWidget
-  ).subscribe({
-    next: () => {
-      console.log('Saved to backend');
-    },
-    error: (error) => {
-      console.error('Error saving:', error);
-    }
-  });
-}
+  // Create empty root widget
+  private createEmptyRoot(): FlutterWidget {
+    return {
+      id: uuidv4(),
+      type: WidgetType.CONTAINER,
+      properties: {
+        width: undefined,
+        height: undefined,
+        color: '#FFFFFF'
+      },
+      children: []
+    };
+  }
 
-setCurrentProject(projectId: number) {
-  this.currentProjectId = projectId;
-}
+  // Get current screen ID
+  getCurrentScreenId(): number | null {
+    return this.currentScreenId;
+  }
 
-getCurrentProject(): number | null {
-  return this.currentProjectId;
-}
+  // Check if there are unsaved changes
+  getHasUnsavedChanges(): boolean {
+    return this.hasUnsavedChanges;
+  }
+
+  // Mark as having unsaved changes
+  markAsChanged(): void {
+    this.hasUnsavedChanges = true;
+  }
+
+  // Enable/disable auto-save
+  setAutoSaveEnabled(enabled: boolean): void {
+    this.autoSaveEnabled = enabled;
+  }
+
   /**
    * Load the sample widget tree from Phase 1
    */
@@ -133,53 +200,56 @@ getCurrentProject(): number | null {
       ...this.stateSubject.value,
       ...updates
     });
+
+    // Mark as changed if widget structure updated
+    if (updates.rootWidget !== undefined) {
+      this.markAsChanged();
+    }
   }
 
   /**
    * Add a new widget to the canvas
-   * @param widgetType Type of widget to add
-   * @param parentId Optional parent widget ID
-   * @param index Optional index within parent's children
    */
-addWidget(widgetType: WidgetType, parentId?: string | null, index?: number): void {
-  try {
-    const newWidget = this.widgetRegistry.createWidget(widgetType);
+  addWidget(widgetType: WidgetType, parentId?: string | null, index?: number): void {
+    try {
+      const newWidget = this.widgetRegistry.createWidget(widgetType);
 
-    const updatedRoot = this.treeService.addWidget(
-      this.currentState.rootWidget,
-      newWidget,
-      parentId || null,
-      index
-    );
+      const updatedRoot = this.treeService.addWidget(
+        this.currentState.rootWidget,
+        newWidget,
+        parentId || null,
+        index
+      );
 
-    if (updatedRoot !== this.currentState.rootWidget) {
-      this.updateState({
-        rootWidget: updatedRoot,
-        selectedWidgetId: newWidget.id
-      });
-      this.saveToHistory(updatedRoot);
-
-      // Sync with backend if screen is loaded
-      if (this.currentScreenId) {
-        this.screenService.addWidget(this.currentScreenId, {
-          widget_type: widgetType,
-          parent_id: parentId,
-          index: index,
-          properties: newWidget.properties
-        }).subscribe({
-          next: (response) => {
-            console.log('Widget added to backend');
-          },
-          error: (error) => {
-            console.error('Error syncing with backend:', error);
-          }
+      if (updatedRoot !== this.currentState.rootWidget) {
+        this.updateState({
+          rootWidget: updatedRoot,
+          selectedWidgetId: newWidget.id
         });
+        this.saveToHistory(updatedRoot);
+
+        // Sync with backend if screen is loaded
+        if (this.currentScreenId) {
+          this.screenService.addWidget(this.currentScreenId, {
+            widget_type: widgetType,
+            parent_id: parentId,
+            index: index,
+            properties: newWidget.properties
+          }).subscribe({
+            next: (response) => {
+              console.log('Widget added to backend');
+            },
+            error: (error) => {
+              console.error('Error syncing with backend:', error);
+            }
+          });
+        }
       }
+    } catch (error) {
+      console.error('Error adding widget:', error);
     }
-  } catch (error) {
-    console.error('Error adding widget:', error);
   }
-}
+
   /**
    * Add a widget with drop position (for drag and drop)
    */

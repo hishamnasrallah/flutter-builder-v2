@@ -1,0 +1,99 @@
+.screen-manager {
+  @apply bg-white rounded-lg shadow-xl w-96 max-h-[80vh] flex flex-col;
+}
+
+.manager-header {
+  @apply flex items-center justify-between px-4 py-3 border-b border-gray-200;
+}
+
+.close-btn {
+  @apply p-1 hover:bg-gray-100 rounded transition-colors;
+}
+
+.manager-content {
+  @apply flex-1 overflow-y-auto p-4;
+}
+
+.loading-state {
+  @apply text-center py-8;
+}
+
+.spinner {
+  @apply w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin mx-auto mb-2;
+}
+
+.create-section {
+  @apply mb-4;
+}
+
+.create-btn {
+  @apply w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors;
+}
+
+.create-form {
+  @apply space-y-2;
+}
+
+.form-input {
+  @apply w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
+.form-actions {
+  @apply flex gap-2;
+}
+
+.btn-sm {
+  @apply px-3 py-1.5 text-sm rounded transition-colors;
+}
+
+.btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 text-gray-700 hover:bg-gray-300;
+}
+
+.screens-list {
+  @apply space-y-2;
+}
+
+.screen-item {
+  @apply p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors;
+}
+
+.screen-item.is-home {
+  @apply bg-blue-50 hover:bg-blue-100;
+}
+
+.screen-info {
+  @apply flex-1;
+}
+
+.screen-name {
+  @apply font-medium text-gray-800 flex items-center gap-2;
+}
+
+.home-badge {
+  @apply text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded;
+}
+
+.screen-route {
+  @apply text-sm text-gray-500;
+}
+
+.screen-actions {
+  @apply flex gap-1;
+}
+
+.action-btn {
+  @apply p-1.5 hover:bg-white rounded transition-colors;
+}
+
+.edit-form {
+  @apply space-y-2;
+}
+
+.empty-state {
+  @apply text-center py-8;
+}

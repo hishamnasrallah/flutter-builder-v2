@@ -1,0 +1,58 @@
+<div class="screen-tabs">
+  <div class="tabs-container">
+    @if (loading) {
+      <div class="loading-tab">
+        <span class="text-xs text-gray-500">Loading screens...</span>
+      </div>
+    } @else {
+      @for (screen of screens; track screen.id) {
+        <button
+          class="tab"
+          [class.active]="activeScreenId === screen.id"
+          (click)="selectScreen(screen)"
+          [title]="screen.route">
+          <span class="tab-icon">{{ getScreenIcon(screen) }}</span>
+          <span class="tab-name">{{ screen.name }}</span>
+          @if (screen.is_home) {
+            <span class="home-indicator"></span>
+          }
+        </button>
+      }
+
+      @if (screens.length === 0) {
+        <div class="empty-tab">
+          <span class="text-xs text-gray-500">No screens yet</span>
+        </div>
+      }
+    }
+
+    <!-- Add Screen Button -->
+    <button
+      class="add-tab"
+      (click)="createNewScreen()"
+      title="Add New Screen">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+      </svg>
+    </button>
+
+    <!-- Manage Screens Button -->
+    <button
+      class="manage-btn"
+      (click)="openScreenManager.emit()"
+      title="Manage Screens">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M4 6h16M4 12h16M4 18h16"></path>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Auto-save Indicator -->
+  @if (savingIndicator) {
+    <div class="save-indicator">
+      <div class="save-dot"></div>
+      <span class="text-xs text-gray-500">Saving...</span>
+    </div>
+  }
+</div>

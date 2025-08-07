@@ -1,0 +1,145 @@
+<div class="screen-manager">
+  <div class="manager-header">
+    <h3 class="text-lg font-semibold">Screens</h3>
+    <button class="close-btn" (click)="close()">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+      </svg>
+    </button>
+  </div>
+
+  <div class="manager-content">
+    @if (loading) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading screens...</p>
+      </div>
+    } @else {
+      <!-- Create New Screen -->
+      <div class="create-section">
+        @if (!showCreateForm) {
+          <button class="create-btn" (click)="showCreateForm = true">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            New Screen
+          </button>
+        } @else {
+          <div class="create-form">
+            <input
+              type="text"
+              [(ngModel)]="newScreen.name"
+              placeholder="Screen Name"
+              class="form-input">
+            <input
+              type="text"
+              [(ngModel)]="newScreen.route"
+              placeholder="/route"
+              class="form-input">
+            <div class="form-actions">
+              <button class="btn-sm btn-primary" (click)="createScreen()">Create</button>
+              <button class="btn-sm btn-secondary" (click)="resetCreateForm()">Cancel</button>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Screens List -->
+      <div class="screens-list">
+        @for (screen of screens; track screen.id) {
+          <div
+            class="screen-item"
+            [class.is-home]="screen.is_home"
+            (click)="selectScreen(screen)">
+
+            @if (editingScreen?.id === screen.id) {
+              <!-- Edit Mode -->
+              <div class="edit-form" (click)="$event.stopPropagation()">
+                <input
+                  type="text"
+                  [(ngModel)]="editingScreen!.name"
+                  class="form-input">
+                <input
+                  type="text"
+                  [(ngModel)]="editingScreen!.route"
+                  class="form-input">
+                <div class="form-actions">
+                  <button class="btn-sm btn-primary" (click)="saveEdit()">Save</button>
+                  <button class="btn-sm btn-secondary" (click)="cancelEdit()">Cancel</button>
+                </div>
+              </div>
+            } @else {
+              <!-- Display Mode -->
+              <div class="screen-info">
+                <div class="screen-name">
+                  {{ screen.name }}
+                  @if (screen.is_home) {
+                    <span class="home-badge">HOME</span>
+                  }
+                </div>
+                <div class="screen-route">{{ screen.route }}</div>
+              </div>
+
+              <div class="screen-actions">
+                @if (!screen.is_home) {
+                  <button
+                    class="action-btn"
+                    (click)="setAsHome(screen, $event)"
+                    title="Set as Home">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                      </path>
+                    </svg>
+                  </button>
+                }
+
+                <button
+                  class="action-btn"
+                  (click)="editScreen(screen, $event)"
+                  title="Edit">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+                    </path>
+                  </svg>
+                </button>
+
+                <button
+                  class="action-btn"
+                  (click)="duplicateScreen(screen, $event)"
+                  title="Duplicate">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                    </path>
+                  </svg>
+                </button>
+
+                @if (!screen.is_home) {
+                  <button
+                    class="action-btn text-red-500"
+                    (click)="deleteScreen(screen, $event)"
+                    title="Delete">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                      </path>
+                    </svg>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @if (screens.length === 0) {
+          <div class="empty-state">
+            <p class="text-sm text-gray-500">No screens yet</p>
+            <p class="text-xs text-gray-400">Create your first screen to start</p>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

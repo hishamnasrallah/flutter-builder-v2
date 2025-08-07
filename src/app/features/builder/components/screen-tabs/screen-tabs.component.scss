@@ -1,0 +1,47 @@
+.screen-tabs {
+  @apply flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200;
+}
+
+.tabs-container {
+  @apply flex items-center gap-1 flex-1 overflow-x-auto;
+}
+
+.tab {
+  @apply flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-t transition-colors whitespace-nowrap;
+}
+
+.tab.active {
+  @apply bg-blue-500 text-white hover:bg-blue-600;
+}
+
+.tab-icon {
+  @apply text-xs;
+}
+
+.tab-name {
+  @apply font-medium;
+}
+
+.home-indicator {
+  @apply w-2 h-2 bg-white rounded-full;
+}
+
+.loading-tab, .empty-tab {
+  @apply px-3 py-1.5;
+}
+
+.add-tab {
+  @apply p-1.5 hover:bg-gray-100 rounded transition-colors text-gray-600;
+}
+
+.manage-btn {
+  @apply p-1.5 hover:bg-gray-100 rounded transition-colors text-gray-600 ml-2;
+}
+
+.save-indicator {
+  @apply flex items-center gap-2 ml-4;
+}
+
+.save-dot {
+  @apply w-2 h-2 bg-green-500 rounded-full animate-pulse;
+}
