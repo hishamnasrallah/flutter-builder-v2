@@ -258,7 +258,7 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
     }
 
     .cdk-drag-animating {
-      @apply transition-transform duration-250;
+    @apply transition-transform duration-200;
     }
   `]
 })

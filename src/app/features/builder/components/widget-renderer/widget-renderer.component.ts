@@ -393,7 +393,7 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
     }
 
     .cdk-drag-animating {
-      @apply transition-transform duration-250;
+    @apply transition-transform duration-200;
     }
   `]
 })
@@ -450,32 +450,31 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
   }
 
   onDrop(event: CdkDragDrop<any>) {
-    event.stopPropagation();
+  // Remove the stopPropagation line - it's not needed
+  const dragData = event.item.data as DragData;
+  const dropWidget = event.container.data as FlutterWidget;
 
-    const dragData = event.item.data as DragData;
-    const dropWidget = event.container.data as FlutterWidget;
+  console.log('Drop event:', dragData, 'on', dropWidget.type);
 
-    console.log('Drop event:', dragData, 'on', dropWidget.type);
+  // Calculate drop index based on position
+  const dropIndex = event.currentIndex || dropWidget.children.length;
 
-    // Calculate drop index based on position
-    const dropIndex = event.currentIndex || dropWidget.children.length;
-
-    if (dragData.type === 'new-widget' && dragData.widgetType) {
-      // Add new widget
-      this.canvasState.addWidgetAtDropPosition(
-        dragData.widgetType,
-        dropWidget.id,
-        dropIndex
-      );
-    } else if (dragData.type === 'existing-widget' && dragData.widgetId) {
-      // Move existing widget
-      this.canvasState.moveWidget(
-        dragData.widgetId,
-        dropWidget.id,
-        dropIndex
-      );
-    }
+  if (dragData.type === 'new-widget' && dragData.widgetType) {
+    // Add new widget
+    this.canvasState.addWidgetAtDropPosition(
+      dragData.widgetType,
+      dropWidget.id,
+      dropIndex
+    );
+  } else if (dragData.type === 'existing-widget' && dragData.widgetId) {
+    // Move existing widget
+    this.canvasState.moveWidget(
+      dragData.widgetId,
+      dropWidget.id,
+      dropIndex
+    );
   }
+}
 
   showDropIndicator(index: number): boolean {
     return this.isDropTarget && this.dropIndicatorIndex === index;
