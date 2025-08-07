@@ -1,7 +1,7 @@
 // src/app/features/builder/components/widget-renderer/widget-renderer.component.ts
 
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, ChangeDetectionStrategy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import {Component, Input, Output, EventEmitter, OnInit, OnChanges, ChangeDetectionStrategy} from '@angular/core';
+import {CommonModule} from '@angular/common';
 import {
   FlutterWidget,
   WidgetType,
@@ -9,9 +9,9 @@ import {
   CrossAxisAlignment,
   Alignment
 } from '../../../../core/models/flutter-widget.model';
-import { CanvasStateService, DragData } from '../../../../core/services/canvas-state.service';
-import { WidgetRegistryService } from '../../../../core/services/widget-registry.service';
-import { SelectionService } from '../../../../core/services/selection.service';
+import {CanvasStateService, DragData} from '../../../../core/services/canvas-state.service';
+import {WidgetRegistryService} from '../../../../core/services/widget-registry.service';
+import {SelectionService} from '../../../../core/services/selection.service';
 
 @Component({
   selector: 'app-widget-renderer',
@@ -258,13 +258,19 @@ import { SelectionService } from '../../../../core/services/selection.service';
             (dragleave)="onDragLeave($event)"
             [class.drop-zone-active]="isDragOver">
 
-            @for (child of widget.children; track child.id) {
-              <app-widget-renderer
-                [widget]="child"
-                [selectedId]="selectedId"
-                [parentWidget]="widget"
-                (widgetClick)="bubbleClick($event)">
-              </app-widget-renderer>
+            @if (widget.children.length > 0) {
+              @for (child of widget.children; track child.id) {
+                <app-widget-renderer
+                  [widget]="child"
+                  [selectedId]="selectedId"
+                  [parentWidget]="widget"
+                  (widgetClick)="bubbleClick($event)">
+                </app-widget-renderer>
+              }
+            } @else {
+              <div class="empty-layout">
+                <span class="empty-text">Drop widgets here</span>
+              </div>
             }
           </div>
         }
@@ -385,6 +391,7 @@ import { SelectionService } from '../../../../core/services/selection.service';
     .drop-indicator-vertical.show {
       @apply opacity-100;
     }
+
     .widget-multi-selected {
       @apply outline outline-2 outline-purple-500 outline-offset-2 !important;
     }
@@ -412,10 +419,20 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
     private canvasState: CanvasStateService,
     private widgetRegistry: WidgetRegistryService,
     private selectionService: SelectionService
-  ) {}
+  ) {
+  }
 
   ngOnInit() {
     this.updateCanAcceptChildren();
+
+    // DEBUG: Log widget being rendered
+    console.log('WidgetRenderer - Rendering widget:', {
+      id: this.widget.id,
+      type: this.widget.type,
+      properties: this.widget.properties,
+      childrenCount: this.widget.children?.length || 0,
+      parent: this.parentWidget?.id || 'no parent'
+    });
   }
 
   ngOnChanges() {
@@ -436,17 +453,17 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
   }
 
   handleClick(event: MouseEvent) {
-  event.stopPropagation();
+    event.stopPropagation();
 
-  // Support multi-select with Ctrl/Cmd key
-  const isMultiSelect = event.ctrlKey || event.metaKey;
+    // Support multi-select with Ctrl/Cmd key
+    const isMultiSelect = event.ctrlKey || event.metaKey;
 
-  if (isMultiSelect) {
-    this.selectionService.selectWidget(this.widget.id, true);
-  } else {
-    this.selectionService.selectWidget(this.widget.id, false);
+    if (isMultiSelect) {
+      this.selectionService.selectWidget(this.widget.id, true);
+    } else {
+      this.selectionService.selectWidget(this.widget.id, false);
+    }
   }
-}
 
   // Add method to check if widget is selected
   get isMultiSelected(): boolean {
@@ -475,105 +492,106 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
   }
 
   onDrop(event: DragEvent) {
-  event.preventDefault();
-  event.stopPropagation();
+    event.preventDefault();
+    event.stopPropagation();
 
-  this.isDragOver = false;
+    this.isDragOver = false;
 
-  try {
-    const dataText = event.dataTransfer!.getData('application/json');
-    if (!dataText) return;
+    try {
+      const dataText = event.dataTransfer!.getData('application/json');
+      if (!dataText) return;
 
-    const dragData = JSON.parse(dataText) as DragData;
+      const dragData = JSON.parse(dataText) as DragData;
 
-    // Check max children constraint
-    const maxChildren = this.widgetRegistry.getMaxChildren(this.widget.type);
-    if (maxChildren !== undefined && this.widget.children.length >= maxChildren) {
-      const notification = (window as any).notificationService;
-      if (notification) {
-        notification.showWarning(`${this.widget.type} can only have ${maxChildren} child widget(s)`);
-      }
-      return;
-    }
-
-    // Calculate drop index based on mouse position
-    const dropIndex = this.calculateDropIndex(event);
-
-    if (dragData.type === 'new-widget' && dragData.widgetType) {
-      // Add new widget at calculated position
-      this.canvasState.addWidgetAtDropPosition(
-        dragData.widgetType,
-        this.widget.id,
-        dropIndex
-      );
-    } else if (dragData.type === 'existing-widget' && dragData.widgetId) {
-      // Don't allow dropping on self or descendants
-      if (dragData.widgetId === this.widget.id) {
+      // Check max children constraint
+      const maxChildren = this.widgetRegistry.getMaxChildren(this.widget.type);
+      if (maxChildren !== undefined && this.widget.children.length >= maxChildren) {
+        const notification = (window as any).notificationService;
+        if (notification) {
+          notification.showWarning(`${this.widget.type} can only have ${maxChildren} child widget(s)`);
+        }
         return;
       }
 
-      // Check if we're trying to drop a parent into its child
-      if (this.isDescendantOf(dragData.widgetId)) {
-        console.warn('Cannot drop parent into its own child');
-        return;
-      }
+      // Calculate drop index based on mouse position
+      const dropIndex = this.calculateDropIndex(event);
 
-      // Move existing widget
-      this.canvasState.moveWidget(
-        dragData.widgetId,
-        this.widget.id,
-        dropIndex
-      );
+      if (dragData.type === 'new-widget' && dragData.widgetType) {
+        // Add new widget at calculated position
+        this.canvasState.addWidgetAtDropPosition(
+          dragData.widgetType,
+          this.widget.id,
+          dropIndex
+        );
+      } else if (dragData.type === 'existing-widget' && dragData.widgetId) {
+        // Don't allow dropping on self or descendants
+        if (dragData.widgetId === this.widget.id) {
+          return;
+        }
+
+        // Check if we're trying to drop a parent into its child
+        if (this.isDescendantOf(dragData.widgetId)) {
+          console.warn('Cannot drop parent into its own child');
+          return;
+        }
+
+        // Move existing widget
+        this.canvasState.moveWidget(
+          dragData.widgetId,
+          this.widget.id,
+          dropIndex
+        );
+      }
+    } catch (error) {
+      console.error('Error handling drop:', error);
     }
-  } catch (error) {
-    console.error('Error handling drop:', error);
   }
-}
-private calculateDropIndex(event: DragEvent): number {
-  // For Row widgets, calculate based on X position
-  if (this.widget.type === WidgetType.ROW) {
+
+  private calculateDropIndex(event: DragEvent): number {
+    // For Row widgets, calculate based on X position
+    if (this.widget.type === WidgetType.ROW) {
+      const container = event.currentTarget as HTMLElement;
+      const children = Array.from(container.querySelectorAll(':scope > .child-wrapper-horizontal'));
+
+      for (let i = 0; i < children.length; i++) {
+        const rect = children[i].getBoundingClientRect();
+        if (event.clientX < rect.left + rect.width / 2) {
+          return i;
+        }
+      }
+      return this.widget.children.length;
+    }
+
+    // For Column and other vertical layouts, calculate based on Y position
     const container = event.currentTarget as HTMLElement;
-    const children = Array.from(container.querySelectorAll(':scope > .child-wrapper-horizontal'));
+    const children = Array.from(container.querySelectorAll(':scope > .child-wrapper'));
 
     for (let i = 0; i < children.length; i++) {
       const rect = children[i].getBoundingClientRect();
-      if (event.clientX < rect.left + rect.width / 2) {
+      if (event.clientY < rect.top + rect.height / 2) {
         return i;
       }
     }
+
     return this.widget.children.length;
   }
 
-  // For Column and other vertical layouts, calculate based on Y position
-  const container = event.currentTarget as HTMLElement;
-  const children = Array.from(container.querySelectorAll(':scope > .child-wrapper'));
-
-  for (let i = 0; i < children.length; i++) {
-    const rect = children[i].getBoundingClientRect();
-    if (event.clientY < rect.top + rect.height / 2) {
-      return i;
+  private isDescendantOf(ancestorId: string): boolean {
+    let current = this.parentWidget;
+    while (current) {
+      if (current.id === ancestorId) {
+        return true;
+      }
+      current = this.canvasState.findWidget(current.parent || '') || null;
     }
+    return false;
   }
-
-  return this.widget.children.length;
-}
-
-private isDescendantOf(ancestorId: string): boolean {
-  let current = this.parentWidget;
-  while (current) {
-    if (current.id === ancestorId) {
-      return true;
-    }
-    current = this.canvasState.findWidget(current.parent || '') || null;
-  }
-  return false;
-}
 
 
   onDragStart(event: DragEvent) {
     // Don't start drag if clicking on an empty container
     if ((event.target as HTMLElement).classList.contains('empty-container') ||
-        (event.target as HTMLElement).classList.contains('empty-layout')) {
+      (event.target as HTMLElement).classList.contains('empty-layout')) {
       event.preventDefault();
       return;
     }

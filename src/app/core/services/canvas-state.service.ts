@@ -97,26 +97,35 @@ export class CanvasStateService {
   });
 
   this.screenService.getScreen(screenId).subscribe({
-    next: (screen) => {
-      let loadedUiStructure = screen.ui_structure;
+  next: (screen) => {
+    console.log('CanvasStateService - Raw screen from backend:', screen);
+    console.log('  - screen.ui_structure:', screen.ui_structure);
 
-      // Normalize the UI structure to ensure all 'children' properties are arrays
-      if (loadedUiStructure) {
-        loadedUiStructure = this.normalizeWidgetChildren(loadedUiStructure);
-      }
+    let loadedUiStructure = screen.ui_structure;
 
-      // Load the UI structure
-      this.updateState({
-        rootWidget: loadedUiStructure || this.createEmptyRoot()
-      });
+    // Normalize the UI structure to ensure all 'children' properties are arrays
+    if (loadedUiStructure) {
+      loadedUiStructure = this.normalizeWidgetChildren(loadedUiStructure);
+      console.log('CanvasStateService - After normalization:', loadedUiStructure);
+    } else {
+      console.log('CanvasStateService - ui_structure is null/undefined, creating empty root');
+    }
 
-      // Reset history for new screen
-      this.history = [loadedUiStructure || this.createEmptyRoot()];
-      this.historyIndex = 0;
-      this.hasUnsavedChanges = false;
+    // Load the UI structure
+    const widgetToLoad = loadedUiStructure || this.createEmptyRoot();
+    console.log('CanvasStateService - Final widget to load:', widgetToLoad);
 
-      console.log(`Loaded screen: ${screen.name}`);
-    },
+    this.updateState({
+      rootWidget: widgetToLoad
+    });
+
+    // Reset history for new screen
+    this.history = [widgetToLoad];
+    this.historyIndex = 0;
+    this.hasUnsavedChanges = false;
+
+    console.log(`Loaded screen: ${screen.name}`);
+  },
     error: (error) => {
       console.error('Error loading screen:', error);
       // Create empty root on error

@@ -53,30 +53,41 @@ export class CanvasComponent implements OnInit, OnDestroy {
     return ['palette-Layout', 'palette-Basic', 'palette-Material', 'palette-Form', 'palette-Navigation'];
   }
   ngOnInit() {
-    // Subscribe to canvas state changes
-    this.canvasState.state$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe((state: CanvasState) => {
-        this.rootWidget = state.rootWidget;
-        this.selectedWidgetId = state.selectedWidgetId;
-        this.isDragging = state.isDragging;
-        this.updateStatistics();
+  // Subscribe to canvas state changes
+  this.canvasState.state$
+    .pipe(takeUntil(this.destroy$))
+    .subscribe((state: CanvasState) => {
+      this.rootWidget = state.rootWidget;
+      this.selectedWidgetId = state.selectedWidgetId;
+      this.isDragging = state.isDragging;
+      this.updateStatistics();
 
-        // Get selected widget details
-        if (state.selectedWidgetId) {
-          this.selectedWidget = this.canvasState.findWidget(state.selectedWidgetId);
-        } else {
-          this.selectedWidget = null;
-        }
+      // DEBUG: Log rootWidget to inspect its value
+      console.log('CanvasComponent - rootWidget updated:', this.rootWidget);
+      if (this.rootWidget) {
+        console.log('  - rootWidget.type:', this.rootWidget.type);
+        console.log('  - rootWidget.id:', this.rootWidget.id);
+        console.log('  - rootWidget.children:', this.rootWidget.children);
+        console.log('  - rootWidget.properties:', this.rootWidget.properties);
+      } else {
+        console.log('  - rootWidget is null/undefined');
+      }
 
-        // Update undo/redo state
-        this.canUndo = this.canvasState.canUndo();
-        this.canRedo = this.canvasState.canRedo();
-      });
+      // Get selected widget details
+      if (state.selectedWidgetId) {
+        this.selectedWidget = this.canvasState.findWidget(state.selectedWidgetId);
+      } else {
+        this.selectedWidget = null;
+      }
 
-    // Setup keyboard shortcuts
-    this.setupKeyboardShortcuts();
-  }
+      // Update undo/redo state
+      this.canUndo = this.canvasState.canUndo();
+      this.canRedo = this.canvasState.canRedo();
+    });
+
+  // Setup keyboard shortcuts
+  this.setupKeyboardShortcuts();
+}
 
   ngOnDestroy() {
     this.destroy$.next();
