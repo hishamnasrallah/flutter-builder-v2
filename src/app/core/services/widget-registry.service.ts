@@ -162,6 +162,89 @@ export class WidgetRegistryService {
         elevation: 4
       }
     });
+
+    // Card Widget
+    this.registerWidget({
+      type: WidgetType.CARD,
+      displayName: 'Card',
+      icon: '🎴',
+      category: WidgetCategory.MATERIAL,
+      isContainer: true,
+      acceptsChildren: true,
+      maxChildren: 1,
+      defaultProperties: {
+        elevation: 4,
+        color: '#FFFFFF',
+        borderRadius: 8,
+        padding: createEdgeInsets(16),
+        margin: createEdgeInsets(8)
+      }
+    });
+
+    // Icon Widget
+    this.registerWidget({
+      type: WidgetType.ICON,
+      displayName: 'Icon',
+      icon: '✦',
+      category: WidgetCategory.BASIC,
+      isContainer: false,
+      acceptsChildren: false,
+      defaultProperties: {
+        icon: 'star',
+        size: 24,
+        color: '#000000'
+      }
+    });
+
+    // ListView Widget
+    this.registerWidget({
+      type: WidgetType.LIST_VIEW,
+      displayName: 'ListView',
+      icon: '📋',
+      category: WidgetCategory.LAYOUT,
+      isContainer: true,
+      acceptsChildren: true,
+      defaultProperties: {
+        scrollDirection: 'vertical',
+        height: 300,
+        padding: createEdgeInsets(0)
+      }
+    });
+
+    // Expanded Widget
+    this.registerWidget({
+      type: WidgetType.EXPANDED,
+      displayName: 'Expanded',
+      icon: '↔',
+      category: WidgetCategory.LAYOUT,
+      isContainer: true,
+      acceptsChildren: true,
+      maxChildren: 1,
+      defaultProperties: {
+        flex: 1
+      }
+    });
+
+    // TextField Widget
+    this.registerWidget({
+      type: WidgetType.TEXT_FIELD,
+      displayName: 'TextField',
+      icon: '📝',
+      category: WidgetCategory.FORM,
+      isContainer: false,
+      acceptsChildren: false,
+      defaultProperties: {
+        hintText: 'Enter text...',
+        text: '',
+        fontSize: 16,
+        color: '#000000',
+        backgroundColor: '#FFFFFF',
+        borderColor: '#D1D5DB',
+        borderWidth: 1,
+        borderRadius: 6,
+        autofocus: false
+      }
+    });
   }
 
   private registerWidget(definition: WidgetDefinition): void {
@@ -286,5 +369,69 @@ export class WidgetRegistryService {
   getMaxChildren(type: WidgetType): number | undefined {
     const definition = this.getWidgetDefinition(type);
     return definition?.maxChildren;
+  }
+  // Add support for dynamic widget creation from backend template
+  createWidgetFromTemplate(template: any): FlutterWidget {
+    const widgetType = template.widget_type as WidgetType;
+
+    // Check if we have a definition for this type
+    let definition = this.getWidgetDefinition(widgetType);
+
+    // If not found, create a temporary definition
+    if (!definition) {
+      definition = {
+        type: widgetType,
+        displayName: template.name,
+        icon: '?',
+        category: WidgetCategory.BASIC,
+        isContainer: template.is_container || false,
+        acceptsChildren: template.is_container || false,
+        maxChildren: template.max_children,
+        defaultProperties: template.properties || {}
+      };
+
+      // Temporarily register this widget type
+      this.registerWidget(definition);
+    }
+
+    return {
+      id: uuidv4(),
+      type: widgetType,
+      properties: { ...template.properties },
+      children: []
+    };
+  }
+
+  // Method to register dynamic widget types from backend
+  registerDynamicWidgetType(template: any): void {
+    const widgetType = template.widget_type as WidgetType;
+
+    // Only register if not already registered
+    if (!this.widgetDefinitions.has(widgetType)) {
+      const definition: WidgetDefinition = {
+        type: widgetType,
+        displayName: template.name,
+        icon: template.icon || '?',
+        category: this.mapTemplateCategory(template.category),
+        isContainer: template.is_container || false,
+        acceptsChildren: template.is_container || false,
+        maxChildren: template.max_children,
+        defaultProperties: template.properties || {}
+      };
+
+      this.registerWidget(definition);
+    }
+  }
+
+  private mapTemplateCategory(category: string): WidgetCategory {
+    const categoryMap: Record<string, WidgetCategory> = {
+      'layout': WidgetCategory.LAYOUT,
+      'display': WidgetCategory.BASIC,
+      'input': WidgetCategory.FORM,
+      'navigation': WidgetCategory.NAVIGATION,
+      'material': WidgetCategory.MATERIAL
+    };
+
+    return categoryMap[category.toLowerCase()] || WidgetCategory.BASIC;
   }
 }

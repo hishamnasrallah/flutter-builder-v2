@@ -20,6 +20,43 @@ export enum WidgetType {
   SIZED_BOX = 'SizedBox',
   SCAFFOLD = 'Scaffold',
   APP_BAR = 'AppBar',
+  // Add new dynamic widget types
+  ELEVATED_BUTTON = 'ElevatedButton',
+  TEXT_BUTTON = 'TextButton',
+  OUTLINED_BUTTON = 'OutlinedButton',
+  ICON_BUTTON = 'IconButton',
+  TEXT_FIELD = 'TextField',
+  TEXT_FORM_FIELD = 'TextFormField',
+  CARD = 'Card',
+  LIST_VIEW = 'ListView',
+  GRID_VIEW = 'GridView',
+  IMAGE = 'Image',
+  ICON = 'Icon',
+  DIVIDER = 'Divider',
+  EXPANDED = 'Expanded',
+  FLEXIBLE = 'Flexible',
+  WRAP = 'Wrap',
+  ASPECT_RATIO = 'AspectRatio',
+  FITTED_BOX = 'FittedBox',
+  LIST_TILE = 'ListTile',
+  CHECKBOX = 'Checkbox',
+  RADIO = 'Radio',
+  SWITCH = 'Switch',
+  SLIDER = 'Slider',
+  DROPDOWN_BUTTON = 'DropdownButton',
+  CIRCULAR_PROGRESS = 'CircularProgressIndicator',
+  LINEAR_PROGRESS = 'LinearProgressIndicator',
+  DRAWER = 'Drawer',
+  BOTTOM_NAV_BAR = 'BottomNavigationBar',
+  TAB_BAR = 'TabBar',
+  FAB = 'FloatingActionButton',
+  POPUP_MENU = 'PopupMenuButton',
+  TOOLTIP = 'Tooltip',
+  FORM = 'Form',
+
+  // Generic fallback for unknown types
+  CUSTOM = 'Custom'
+
 }
 
 export interface WidgetProperties {

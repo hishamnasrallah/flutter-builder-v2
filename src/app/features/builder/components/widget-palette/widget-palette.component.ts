@@ -11,9 +11,23 @@ import {
 } from '../../../../core/models/flutter-widget.model';
 import { WidgetRegistryService } from '../../../../core/services/widget-registry.service';
 import { CanvasStateService, DragData } from '../../../../core/services/canvas-state.service';
+import { ComponentTemplateService } from '../../../../core/services/component-template.service';
+import { NotificationService } from '../../../../core/services/notification.service';
+
+interface ComponentTemplate {
+  id: number;
+  name: string;
+  category: string;
+  widget_type: string;
+  widget_group: string;
+  properties: any;
+  is_container: boolean;
+  max_children?: number;
+  description?: string;
+}
 
 interface CategoryGroup {
-  category: WidgetCategory;
+  category: string;
   displayName: string;
   widgets: WidgetDefinition[];
   isExpanded: boolean;
@@ -217,14 +231,161 @@ export class WidgetPaletteComponent implements OnInit {
 
   constructor(
     private widgetRegistry: WidgetRegistryService,
-    private canvasState: CanvasStateService
+    private canvasState: CanvasStateService,
+    private componentTemplateService: ComponentTemplateService,
+    private notification: NotificationService
   ) {}
 
   ngOnInit() {
-    this.initializeCategories();
+    this.loadDynamicWidgets();
   }
 
-  private initializeCategories(): void {
+  private loadDynamicWidgets(): void {
+    this.componentTemplateService.getOrganizedComponents().subscribe({
+      next: (response: any) => {
+        if (response && response.components) {
+          this.processDynamicWidgets(response.components);
+        } else {
+          // Fallback to components endpoint if organized doesn't work
+          this.loadFallbackWidgets();
+        }
+      },
+      error: (error) => {
+        console.error('Error loading dynamic widgets:', error);
+        this.notification.showWarning('Failed to load widgets from server, using defaults');
+        this.initializeStaticCategories(); // Fallback to static definitions
+      }
+    });
+  }
+
+  private loadFallbackWidgets(): void {
+    this.componentTemplateService.getComponentsForBuilder().subscribe({
+      next: (templates: ComponentTemplate[]) => {
+        const groupedTemplates = this.groupTemplatesByCategory(templates);
+        this.buildCategoryGroups(groupedTemplates);
+      },
+      error: (error) => {
+        console.error('Error loading fallback widgets:', error);
+        this.initializeStaticCategories();
+      }
+    });
+  }
+
+  private processDynamicWidgets(componentsByGroup: Record<string, ComponentTemplate[]>): void {
+    this.categoryGroups = Object.entries(componentsByGroup).map(([groupName, templates]) => ({
+      category: groupName,
+      displayName: groupName,
+      widgets: templates.map(template => this.mapTemplateToWidgetDefinition(template)),
+      isExpanded: groupName === 'Basic Layout' || groupName === 'Basic Display'
+    }));
+
+    this.categoryGroups = this.categoryGroups.filter(group => group.widgets.length > 0);
+    this.filteredGroups = [...this.categoryGroups];
+  }
+
+  private groupTemplatesByCategory(templates: ComponentTemplate[]): Map<string, ComponentTemplate[]> {
+    const grouped = new Map<string, ComponentTemplate[]>();
+
+    templates.forEach(template => {
+      const category = template.widget_group || template.category || 'Other';
+      if (!grouped.has(category)) {
+        grouped.set(category, []);
+      }
+      grouped.get(category)!.push(template);
+    });
+
+    return grouped;
+  }
+
+  private buildCategoryGroups(groupedTemplates: Map<string, ComponentTemplate[]>): void {
+    this.categoryGroups = Array.from(groupedTemplates.entries()).map(([categoryName, templates]) => ({
+      category: categoryName,
+      displayName: categoryName,
+      widgets: templates.map(template => this.mapTemplateToWidgetDefinition(template)),
+      isExpanded: categoryName.toLowerCase().includes('basic') || categoryName.toLowerCase().includes('layout')
+    }));
+
+    this.categoryGroups = this.categoryGroups.filter(group => group.widgets.length > 0);
+    this.filteredGroups = [...this.categoryGroups];
+  }
+
+  private mapTemplateToWidgetDefinition(template: ComponentTemplate): WidgetDefinition {
+    return {
+      type: template.widget_type as WidgetType,
+      displayName: template.name,
+      icon: this.getIconForWidgetType(template.widget_type),
+      category: this.mapCategoryString(template.category),
+      isContainer: template.is_container,
+      acceptsChildren: template.is_container,
+      maxChildren: template.max_children,
+      defaultProperties: template.properties || {}
+    };
+  }
+
+  private mapCategoryString(category: string): WidgetCategory {
+    const categoryMap: Record<string, WidgetCategory> = {
+      'layout': WidgetCategory.LAYOUT,
+      'display': WidgetCategory.BASIC,
+      'input': WidgetCategory.FORM,
+      'navigation': WidgetCategory.NAVIGATION,
+      'material': WidgetCategory.MATERIAL
+    };
+
+    return categoryMap[category.toLowerCase()] || WidgetCategory.BASIC;
+  }
+
+  private getIconForWidgetType(widgetType: string): string {
+    const iconMap: Record<string, string> = {
+      'Container': '□',
+      'Text': 'T',
+      'Column': '⬇',
+      'Row': '➡',
+      'Stack': '⬚',
+      'Padding': '▫',
+      'Center': '⊕',
+      'SizedBox': '▭',
+      'Scaffold': '📱',
+      'AppBar': '━',
+      'ElevatedButton': '🔘',
+      'Button': '🔘',
+      'TextField': '📝',
+      'Card': '🎴',
+      'ListView': '📋',
+      'GridView': '⚏',
+      'Image': '🖼️',
+      'Icon': '✦',
+      'Divider': '─',
+      'Expanded': '↔',
+      'Flexible': '⇔',
+      'Wrap': '⤸',
+      'AspectRatio': '▢',
+      'FittedBox': '⊡',
+      'ListTile': '☰',
+      'Checkbox': '☑',
+      'Radio': '⊙',
+      'Switch': '⊛',
+      'Slider': '━●━',
+      'DropdownButton': '▼',
+      'CircularProgressIndicator': '⟳',
+      'LinearProgressIndicator': '▬▬▬',
+      'Drawer': '☰',
+      'BottomNavigationBar': '⊥',
+      'TabBar': '⊤',
+      'FloatingActionButton': '⊕',
+      'PopupMenuButton': '⋮',
+      'Tooltip': '💬',
+      'Hero': '★',
+      'AnimatedContainer': '▢⇄',
+      'FadeTransition': '▒',
+      'Form': '📋',
+      'TextFormField': '📝'
+    };
+
+    return iconMap[widgetType] || '?';
+  }
+
+  // Fallback to static categories if API fails
+  private initializeStaticCategories(): void {
     const categoryDisplayNames: Record<WidgetCategory, string> = {
       [WidgetCategory.LAYOUT]: 'Layout',
       [WidgetCategory.BASIC]: 'Basic',
@@ -233,17 +394,15 @@ export class WidgetPaletteComponent implements OnInit {
       [WidgetCategory.NAVIGATION]: 'Navigation'
     };
 
-    // Get all categories and their widgets
     const categories = Object.values(WidgetCategory);
 
     this.categoryGroups = categories.map(category => ({
-      category,
+      category: category as string,
       displayName: categoryDisplayNames[category],
       widgets: this.widgetRegistry.getWidgetsByCategory(category),
-      isExpanded: category === WidgetCategory.LAYOUT || category === WidgetCategory.BASIC // Default expand these
+      isExpanded: category === WidgetCategory.LAYOUT || category === WidgetCategory.BASIC
     }));
 
-    // Filter out empty categories
     this.categoryGroups = this.categoryGroups.filter(group => group.widgets.length > 0);
     this.filteredGroups = [...this.categoryGroups];
   }

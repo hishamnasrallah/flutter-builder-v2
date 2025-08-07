@@ -282,6 +282,135 @@ import {SelectionService} from '../../../../core/services/selection.service';
           </div>
         }
 
+        <!-- Card Widget -->
+        @case (WidgetType.CARD) {
+          <div
+            class="flutter-card widget-drop-zone"
+            [ngStyle]="getCardStyles()"
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drop-zone-active]="isDragOver">
+            @if (widget.children.length > 0) {
+              @for (child of widget.children; track child.id) {
+                <app-widget-renderer
+                  [widget]="child"
+                  [selectedId]="selectedId"
+                  [parentWidget]="widget"
+                  (widgetClick)="bubbleClick($event)">
+                </app-widget-renderer>
+              }
+            } @else {
+              <div class="empty-layout">
+                <span class="empty-text">Drop widgets here</span>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Icon Widget -->
+        @case (WidgetType.ICON) {
+          <span class="flutter-icon" [ngStyle]="getIconStyles()">
+            @if (widget.properties.icon === 'star') {
+              ⭐
+            } @else if (widget.properties.icon === 'heart') {
+              ❤️
+            } @else if (widget.properties.icon === 'home') {
+              🏠
+            } @else if (widget.properties.icon === 'settings') {
+              ⚙️
+            } @else if (widget.properties.icon === 'user') {
+              👤
+            } @else if (widget.properties.icon === 'search') {
+              🔍
+            } @else if (widget.properties.icon === 'menu') {
+              ☰
+            } @else if (widget.properties.icon === 'close') {
+              ✕
+            } @else if (widget.properties.icon === 'check') {
+              ✓
+            } @else if (widget.properties.icon === 'arrow_back') {
+              ←
+            } @else if (widget.properties.icon === 'arrow_forward') {
+              →
+            } @else {
+              {{ widget.properties.icon || '?' }}
+            }
+          </span>
+        }
+
+        <!-- ListView Widget -->
+        @case (WidgetType.LIST_VIEW) {
+          <div
+            class="flutter-list-view widget-drop-zone"
+            [ngStyle]="getListViewStyles()"
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drop-zone-active]="isDragOver">
+            @if (widget.children.length > 0) {
+              @for (child of widget.children; track child.id; let i = $index) {
+                <div class="list-item-wrapper">
+                  @if (showDropIndicator(i)) {
+                    <div class="drop-indicator-horizontal"></div>
+                  }
+                  <app-widget-renderer
+                    [widget]="child"
+                    [selectedId]="selectedId"
+                    [parentWidget]="widget"
+                    (widgetClick)="bubbleClick($event)">
+                  </app-widget-renderer>
+                </div>
+              }
+              @if (showDropIndicator(widget.children.length)) {
+                <div class="drop-indicator-horizontal"></div>
+              }
+            } @else {
+              <div class="empty-layout">
+                <span class="empty-text">Drop list items here</span>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Expanded Widget -->
+        @case (WidgetType.EXPANDED) {
+          <div
+            class="flutter-expanded widget-drop-zone"
+            [ngStyle]="getExpandedStyles()"
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop($event)"
+            (dragleave)="onDragLeave($event)"
+            [class.drop-zone-active]="isDragOver">
+            @if (widget.children.length > 0) {
+              @for (child of widget.children; track child.id) {
+                <app-widget-renderer
+                  [widget]="child"
+                  [selectedId]="selectedId"
+                  [parentWidget]="widget"
+                  (widgetClick)="bubbleClick($event)">
+                </app-widget-renderer>
+              }
+            } @else {
+              <div class="empty-layout">
+                <span class="empty-text">Drop a single child here</span>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- TextField Widget -->
+        @case (WidgetType.TEXT_FIELD) {
+          <input
+            type="text"
+            class="flutter-text-field"
+            [placeholder]="widget.properties.hintText || 'Enter text...'"
+            [value]="widget.properties.text || ''"
+            [readonly]="true"
+            [ngStyle]="getTextFieldStyles()"
+            (click)="handleClick($event)">
+        }
+
         <!-- Default/Unknown Widget -->
         @default {
           <div class="p-4 bg-gray-100 border border-gray-300">
@@ -394,6 +523,40 @@ import {SelectionService} from '../../../../core/services/selection.service';
 
     .widget-multi-selected {
       @apply outline outline-2 outline-purple-500 outline-offset-2 !important;
+    }
+    .flutter-card {
+      @apply bg-white rounded-lg shadow-md;
+      min-height: 80px;
+      min-width: 80px;
+    }
+
+    .flutter-icon {
+      @apply inline-flex items-center justify-center;
+      min-width: 24px;
+      min-height: 24px;
+    }
+
+    .flutter-list-view {
+      @apply flex overflow-auto border border-dashed border-gray-300 bg-gray-50;
+      min-height: 100px;
+    }
+
+    .list-item-wrapper {
+      @apply relative;
+    }
+
+    .flutter-expanded {
+      @apply border border-dashed border-gray-200 bg-gray-50;
+      min-height: 50px;
+    }
+
+    .flutter-text-field {
+      @apply w-full px-3 py-2 border border-gray-300 rounded-md bg-white;
+      cursor: pointer; /* Since it's read-only in the builder */
+    }
+
+    .flutter-text-field:hover {
+      @apply border-blue-400;
     }
   `]
 })
@@ -788,5 +951,122 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
       [Alignment.BOTTOM_RIGHT]: ['flex-end', 'flex-end'],
     };
     return alignmentMap[alignment] || ['flex-start', 'flex-start'];
+  }
+  getCardStyles(): any {
+    const props = this.widget.properties;
+    const styles: any = {};
+
+    if (props.color) {
+      styles.backgroundColor = props.color;
+    }
+
+    if (props.elevation) {
+      const elevation = Math.min(24, Math.max(0, props.elevation));
+      styles.boxShadow = `0 ${elevation}px ${elevation * 2}px rgba(0,0,0,${0.1 + (elevation * 0.01)})`;
+    }
+
+    if (props.margin) {
+      styles.margin = `${props.margin.top}px ${props.margin.right}px ${props.margin.bottom}px ${props.margin.left}px`;
+    }
+
+    if (props.padding) {
+      styles.padding = `${props.padding.top}px ${props.padding.right}px ${props.padding.bottom}px ${props.padding.left}px`;
+    }
+
+    if (props.borderRadius) {
+      styles.borderRadius = `${props.borderRadius}px`;
+    }
+
+    return styles;
+  }
+
+  getIconStyles(): any {
+    const props = this.widget.properties;
+    const styles: any = {};
+
+    if (props.size) {
+      styles.fontSize = `${props.size}px`;
+      styles.width = `${props.size}px`;
+      styles.height = `${props.size}px`;
+    }
+
+    if (props.color) {
+      styles.color = props.color;
+    }
+
+    styles.display = 'inline-flex';
+    styles.alignItems = 'center';
+    styles.justifyContent = 'center';
+
+    return styles;
+  }
+
+  getListViewStyles(): any {
+    const props = this.widget.properties;
+    const styles: any = {};
+
+    if (props.scrollDirection === 'horizontal') {
+      styles.flexDirection = 'row';
+      styles.overflowX = 'auto';
+      styles.overflowY = 'hidden';
+    } else {
+      styles.flexDirection = 'column';
+      styles.overflowY = 'auto';
+      styles.overflowX = 'hidden';
+    }
+
+    if (props.padding) {
+      styles.padding = `${props.padding.top}px ${props.padding.right}px ${props.padding.bottom}px ${props.padding.left}px`;
+    }
+
+    if (props.height) {
+      styles.height = `${props.height}px`;
+    } else {
+      styles.maxHeight = '400px'; // Default max height for scrolling
+    }
+
+    return styles;
+  }
+
+  getExpandedStyles(): any {
+    const props = this.widget.properties;
+    const styles: any = {};
+
+    const flex = props.flex || 1;
+    styles.flex = `${flex} 1 0`;
+    styles.minHeight = '50px';
+
+    return styles;
+  }
+
+  getTextFieldStyles(): any {
+    const props = this.widget.properties;
+    const styles: any = {};
+
+    if (props.fontSize) {
+      styles.fontSize = `${props.fontSize}px`;
+    }
+
+    if (props.color) {
+      styles.color = props.color;
+    }
+
+    if (props.backgroundColor) {
+      styles.backgroundColor = props.backgroundColor;
+    }
+
+    if (props.borderColor) {
+      styles.borderColor = props.borderColor;
+    }
+
+    if (props.borderWidth) {
+      styles.borderWidth = `${props.borderWidth}px`;
+    }
+
+    if (props.borderRadius) {
+      styles.borderRadius = `${props.borderRadius}px`;
+    }
+
+    return styles;
   }
 }

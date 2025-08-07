@@ -420,6 +420,231 @@ export class PropertyEditorService {
 
     // Center Properties - usually doesn't have specific properties
     this.propertySchemas.set(WidgetType.CENTER, []);
+
+    // Card Properties
+    this.propertySchemas.set(WidgetType.CARD, [
+      {
+        key: 'elevation',
+        label: 'Elevation',
+        type: 'number',
+        category: 'Appearance',
+        defaultValue: 4,
+        min: 0,
+        max: 24,
+        step: 1
+      },
+      {
+        key: 'color',
+        label: 'Background Color',
+        type: 'color',
+        category: 'Appearance',
+        defaultValue: '#FFFFFF'
+      },
+      {
+        key: 'borderRadius',
+        label: 'Border Radius',
+        type: 'number',
+        category: 'Appearance',
+        defaultValue: 8,
+        min: 0,
+        max: 50,
+        step: 1,
+        unit: 'px'
+      },
+      {
+        key: 'margin',
+        label: 'Margin',
+        type: 'spacing',
+        category: 'Spacing',
+        defaultValue: { top: 8, right: 8, bottom: 8, left: 8 }
+      },
+      {
+        key: 'padding',
+        label: 'Padding',
+        type: 'spacing',
+        category: 'Spacing',
+        defaultValue: { top: 16, right: 16, bottom: 16, left: 16 }
+      }
+    ]);
+
+    // Icon Properties
+    this.propertySchemas.set(WidgetType.ICON, [
+      {
+        key: 'icon',
+        label: 'Icon Name',
+        type: 'select',
+        category: 'Content',
+        defaultValue: 'star',
+        options: [
+          { label: 'Star', value: 'star' },
+          { label: 'Heart', value: 'heart' },
+          { label: 'Home', value: 'home' },
+          { label: 'Settings', value: 'settings' },
+          { label: 'User', value: 'user' },
+          { label: 'Search', value: 'search' },
+          { label: 'Menu', value: 'menu' },
+          { label: 'Close', value: 'close' },
+          { label: 'Check', value: 'check' },
+          { label: 'Arrow Back', value: 'arrow_back' },
+          { label: 'Arrow Forward', value: 'arrow_forward' }
+        ]
+      },
+      {
+        key: 'size',
+        label: 'Size',
+        type: 'number',
+        category: 'Appearance',
+        defaultValue: 24,
+        min: 8,
+        max: 128,
+        step: 1,
+        unit: 'px'
+      },
+      {
+        key: 'color',
+        label: 'Color',
+        type: 'color',
+        category: 'Appearance',
+        defaultValue: '#000000'
+      }
+    ]);
+
+    // ListView Properties
+    this.propertySchemas.set(WidgetType.LIST_VIEW, [
+      {
+        key: 'scrollDirection',
+        label: 'Scroll Direction',
+        type: 'select',
+        category: 'Layout',
+        defaultValue: 'vertical',
+        options: [
+          { label: 'Vertical', value: 'vertical' },
+          { label: 'Horizontal', value: 'horizontal' }
+        ]
+      },
+      {
+        key: 'height',
+        label: 'Height',
+        type: 'number',
+        category: 'Layout',
+        defaultValue: 300,
+        min: 100,
+        max: 800,
+        step: 10,
+        unit: 'px'
+      },
+      {
+        key: 'padding',
+        label: 'Padding',
+        type: 'spacing',
+        category: 'Spacing',
+        defaultValue: { top: 0, right: 0, bottom: 0, left: 0 }
+      },
+      {
+        key: 'separatorHeight',
+        label: 'Item Spacing',
+        type: 'number',
+        category: 'Layout',
+        defaultValue: 0,
+        min: 0,
+        max: 50,
+        step: 1,
+        unit: 'px'
+      }
+    ]);
+
+    // Expanded Properties
+    this.propertySchemas.set(WidgetType.EXPANDED, [
+      {
+        key: 'flex',
+        label: 'Flex Factor',
+        type: 'number',
+        category: 'Layout',
+        defaultValue: 1,
+        min: 1,
+        max: 10,
+        step: 1
+      }
+    ]);
+
+    // TextField Properties
+    this.propertySchemas.set(WidgetType.TEXT_FIELD, [
+      {
+        key: 'hintText',
+        label: 'Hint Text',
+        type: 'text',
+        category: 'Content',
+        defaultValue: 'Enter text...'
+      },
+      {
+        key: 'text',
+        label: 'Initial Value',
+        type: 'text',
+        category: 'Content',
+        defaultValue: ''
+      },
+      {
+        key: 'fontSize',
+        label: 'Font Size',
+        type: 'number',
+        category: 'Typography',
+        defaultValue: 16,
+        min: 8,
+        max: 72,
+        step: 1,
+        unit: 'px'
+      },
+      {
+        key: 'color',
+        label: 'Text Color',
+        type: 'color',
+        category: 'Typography',
+        defaultValue: '#000000'
+      },
+      {
+        key: 'backgroundColor',
+        label: 'Background Color',
+        type: 'color',
+        category: 'Appearance',
+        defaultValue: '#FFFFFF'
+      },
+      {
+        key: 'borderColor',
+        label: 'Border Color',
+        type: 'color',
+        category: 'Appearance',
+        defaultValue: '#D1D5DB'
+      },
+      {
+        key: 'borderWidth',
+        label: 'Border Width',
+        type: 'number',
+        category: 'Appearance',
+        defaultValue: 1,
+        min: 0,
+        max: 5,
+        step: 1,
+        unit: 'px'
+      },
+      {
+        key: 'borderRadius',
+        label: 'Border Radius',
+        type: 'number',
+        category: 'Appearance',
+        defaultValue: 6,
+        min: 0,
+        max: 20,
+        step: 1,
+        unit: 'px'
+      },
+      {
+        key: 'autofocus',
+        label: 'Autofocus',
+        type: 'boolean',
+        category: 'Behavior',
+        defaultValue: false
+      }
+    ]);
   }
 
   getPropertiesForWidget(widget: FlutterWidget | null): PropertyCategory[] {
