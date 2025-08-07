@@ -1,12 +1,14 @@
 // src/app/features/builder/builder.component.ts
 
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { CanvasComponent } from './components/canvas/canvas.component';
 import { WidgetPaletteComponent } from './components/widget-palette/widget-palette.component';
 import { WidgetTreeComponent } from './components/widget-tree/widget-tree.component';
 import { PropertiesPanelComponent } from './components/properties-panel/properties-panel.component';
+import { ActivatedRoute } from '@angular/router';
+import { CanvasStateService } from '../../core/services/canvas-state.service';
 
 @Component({
   selector: 'app-builder',
@@ -180,6 +182,24 @@ import { PropertiesPanelComponent } from './components/properties-panel/properti
     }
   `]
 })
-export class BuilderComponent {
+export class BuilderComponent implements OnInit {
   leftTab: 'palette' | 'tree' = 'palette';
+  projectId: number | null = null;
+
+  constructor(
+    private route: ActivatedRoute,
+    private canvasState: CanvasStateService
+  ) {}
+
+  ngOnInit() {
+    // Get project ID from query params
+    this.route.queryParams.subscribe(params => {
+      if (params['projectId']) {
+        this.projectId = Number(params['projectId']);
+        this.canvasState.setCurrentProject(this.projectId);
+        // Load the project's main screen if needed
+        // this.loadProjectScreen();
+      }
+    });
+  }
 }

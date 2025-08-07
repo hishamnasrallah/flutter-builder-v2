@@ -6,6 +6,7 @@ import { FlutterWidget, WidgetType } from '../models/flutter-widget.model';
 import { WidgetRegistryService } from './widget-registry.service';
 import { WidgetTreeService } from './widget-tree.service';
 import { v4 as uuidv4 } from 'uuid';
+import { ScreenService } from './screen.service';
 
 export interface CanvasState {
   rootWidget: FlutterWidget | null;
@@ -60,12 +61,54 @@ export class CanvasStateService {
 
   constructor(
     private widgetRegistry: WidgetRegistryService,
-    private treeService: WidgetTreeService
+    private treeService: WidgetTreeService,
+    private screenService: ScreenService
   ) {
     // Initialize with sample widget tree for testing
     this.loadSampleWidgetTree();
   }
+// Add after the history properties
+private currentScreenId: number | null = null;
+private currentProjectId: number | null = null;
 
+// Add new methods
+loadScreen(screenId: number) {
+  this.currentScreenId = screenId;
+  this.screenService.getScreen(screenId).subscribe({
+    next: (screen) => {
+      this.updateState({
+        rootWidget: screen.ui_structure
+      });
+    },
+    error: (error) => {
+      console.error('Error loading screen:', error);
+    }
+  });
+}
+
+saveToBackend() {
+  if (!this.currentScreenId || !this.currentState.rootWidget) return;
+
+  this.screenService.updateUiStructure(
+    this.currentScreenId,
+    this.currentState.rootWidget
+  ).subscribe({
+    next: () => {
+      console.log('Saved to backend');
+    },
+    error: (error) => {
+      console.error('Error saving:', error);
+    }
+  });
+}
+
+setCurrentProject(projectId: number) {
+  this.currentProjectId = projectId;
+}
+
+getCurrentProject(): number | null {
+  return this.currentProjectId;
+}
   /**
    * Load the sample widget tree from Phase 1
    */
@@ -98,29 +141,45 @@ export class CanvasStateService {
    * @param parentId Optional parent widget ID
    * @param index Optional index within parent's children
    */
-  addWidget(widgetType: WidgetType, parentId?: string | null, index?: number): void {
-    try {
-      const newWidget = this.widgetRegistry.createWidget(widgetType);
+addWidget(widgetType: WidgetType, parentId?: string | null, index?: number): void {
+  try {
+    const newWidget = this.widgetRegistry.createWidget(widgetType);
 
-      const updatedRoot = this.treeService.addWidget(
-        this.currentState.rootWidget,
-        newWidget,
-        parentId || null,
-        index
-      );
+    const updatedRoot = this.treeService.addWidget(
+      this.currentState.rootWidget,
+      newWidget,
+      parentId || null,
+      index
+    );
 
-      if (updatedRoot !== this.currentState.rootWidget) {
-        this.updateState({
-          rootWidget: updatedRoot,
-          selectedWidgetId: newWidget.id
+    if (updatedRoot !== this.currentState.rootWidget) {
+      this.updateState({
+        rootWidget: updatedRoot,
+        selectedWidgetId: newWidget.id
+      });
+      this.saveToHistory(updatedRoot);
+
+      // Sync with backend if screen is loaded
+      if (this.currentScreenId) {
+        this.screenService.addWidget(this.currentScreenId, {
+          widget_type: widgetType,
+          parent_id: parentId,
+          index: index,
+          properties: newWidget.properties
+        }).subscribe({
+          next: (response) => {
+            console.log('Widget added to backend');
+          },
+          error: (error) => {
+            console.error('Error syncing with backend:', error);
+          }
         });
-        this.saveToHistory(updatedRoot);
       }
-    } catch (error) {
-      console.error('Error adding widget:', error);
     }
+  } catch (error) {
+    console.error('Error adding widget:', error);
   }
-
+}
   /**
    * Add a widget with drop position (for drag and drop)
    */

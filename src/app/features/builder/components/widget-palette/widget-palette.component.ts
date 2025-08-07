@@ -22,7 +22,7 @@ interface CategoryGroup {
 @Component({
   selector: 'app-widget-palette',
   standalone: true,
-  imports: [CommonModule, FormsModule, CdkDrag, CdkDragPreview, CdkDropList],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="widget-palette">
       <div class="palette-header">

@@ -15,7 +15,7 @@ import { SelectionOverlayComponent } from '../selection-overlay/selection-overla
 @Component({
   selector: 'app-canvas',
   standalone: true,
-  imports: [CommonModule, WidgetRendererComponent, CdkDropList, SelectionOverlayComponent ],
+  imports: [CommonModule, WidgetRendererComponent, SelectionOverlayComponent ],
   template: `
     <div class="canvas-container">
       <div class="canvas-header">

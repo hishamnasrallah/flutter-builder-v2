@@ -209,7 +209,7 @@ interface ResizeHandle {
 
     /* Context Menu */
     .context-menu {
-      @apply absolute bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-60 pointer-events-auto;
+      @apply absolute bg-white rounded-lg shadow-xl border border-gray-200 py-1 pointer-events-auto;
       min-width: 200px;
     }
 

@@ -2,7 +2,7 @@
 
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { CdkDrag, CdkDragDrop, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
+import {CdkDrag, CdkDragDrop, CdkDragPlaceholder, CdkDropList, moveItemInArray} from '@angular/cdk/drag-drop';
 import { Subject, takeUntil } from 'rxjs';
 import {
   FlutterWidget,
@@ -16,7 +16,7 @@ import { SelectionService } from '../../../../core/services/selection.service';
 @Component({
   selector: 'app-widget-tree',
   standalone: true,
-  imports: [CommonModule, CdkDrag, CdkDropList],
+  imports: [CommonModule, CdkDrag, CdkDropList, CdkDragPlaceholder],
   template: `
     <div class="widget-tree">
       <div class="tree-header">
@@ -282,7 +282,7 @@ export class WidgetTreeComponent implements OnInit, OnDestroy {
     private canvasState: CanvasStateService,
     private treeService: WidgetTreeService,
     private widgetRegistry: WidgetRegistryService,
-    private selectionService: SelectionService
+    public selectionService: SelectionService
 
   ) {}
 
