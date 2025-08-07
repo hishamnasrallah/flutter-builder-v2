@@ -23,7 +23,7 @@ import { SelectionService } from '../../../../core/services/selection.service';
       [ngClass]="getWidgetClasses()"
       [ngStyle]="getWidgetStyles()"
       (click)="handleClick($event)"
-      [class.widget-selected]="isSelected"
+      [class.widget-selected]="isSelected || isMultiSelected"
       [class.widget-hoverable]="true"
       [class.can-accept-children]="canAcceptChildren"
       [draggable]="!isRootWidget"

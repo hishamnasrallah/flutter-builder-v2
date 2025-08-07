@@ -10,11 +10,12 @@ import { WidgetTreeService } from '../../../../core/services/widget-tree.service
 import { FlutterWidget } from '../../../../core/models/flutter-widget.model';
 import { Subject, takeUntil } from 'rxjs';
 import { SelectionService } from '../../../../core/services/selection.service';
+import { SelectionOverlayComponent } from '../selection-overlay/selection-overlay.component';
 
 @Component({
   selector: 'app-canvas',
   standalone: true,
-  imports: [CommonModule, WidgetRendererComponent, CdkDropList],
+  imports: [CommonModule, WidgetRendererComponent, CdkDropList, SelectionOverlayComponent ],
   template: `
     <div class="canvas-container">
       <div class="canvas-header">
@@ -159,6 +160,8 @@ import { SelectionService } from '../../../../core/services/selection.service';
           </div>
         </div>
       </div>
+      <app-selection-overlay></app-selection-overlay>
+
     </div>
   `,
   styles: [`
@@ -278,12 +281,13 @@ export class CanvasComponent implements OnInit, OnDestroy {
   ) {}
   // Add method for canvas background click
   onCanvasClick(event: MouseEvent) {
-    // Clear selection if clicking on empty canvas
-    const target = event.target as HTMLElement;
-    if (target.classList.contains('device-screen')) {
-      this.selectionService.clearSelection();
-    }
+  // Only clear if clicking on empty canvas, not on widgets
+  const target = event.target as HTMLElement;
+  if (target.classList.contains('device-screen') &&
+      !target.closest('[data-widget-id]')) {
+    this.selectionService.clearSelection();
   }
+}
   getConnectedLists(): string[] {
     // Connect to all palette lists
     return ['palette-Layout', 'palette-Basic', 'palette-Material', 'palette-Form', 'palette-Navigation'];
