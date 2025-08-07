@@ -87,38 +87,64 @@ export class CanvasStateService {
 
   // Screen management methods
   loadScreen(screenId: number) {
-    this.currentScreenId = screenId;
+  this.currentScreenId = screenId;
 
-    // Clear current state
-    this.updateState({
-      rootWidget: null,
-      selectedWidgetId: null,
-      hoveredWidgetId: null
-    });
+  // Clear current state
+  this.updateState({
+    rootWidget: null,
+    selectedWidgetId: null,
+    hoveredWidgetId: null
+  });
 
-    this.screenService.getScreen(screenId).subscribe({
-      next: (screen) => {
-        // Load the UI structure
-        this.updateState({
-          rootWidget: screen.ui_structure || this.createEmptyRoot()
-        });
+  this.screenService.getScreen(screenId).subscribe({
+    next: (screen) => {
+      let loadedUiStructure = screen.ui_structure;
 
-        // Reset history for new screen
-        this.history = [screen.ui_structure || this.createEmptyRoot()];
-        this.historyIndex = 0;
-        this.hasUnsavedChanges = false;
-
-        console.log(`Loaded screen: ${screen.name}`);
-      },
-      error: (error) => {
-        console.error('Error loading screen:', error);
-        // Create empty root on error
-        this.updateState({
-          rootWidget: this.createEmptyRoot()
-        });
+      // Normalize the UI structure to ensure all 'children' properties are arrays
+      if (loadedUiStructure) {
+        loadedUiStructure = this.normalizeWidgetChildren(loadedUiStructure);
       }
-    });
+
+      // Load the UI structure
+      this.updateState({
+        rootWidget: loadedUiStructure || this.createEmptyRoot()
+      });
+
+      // Reset history for new screen
+      this.history = [loadedUiStructure || this.createEmptyRoot()];
+      this.historyIndex = 0;
+      this.hasUnsavedChanges = false;
+
+      console.log(`Loaded screen: ${screen.name}`);
+    },
+    error: (error) => {
+      console.error('Error loading screen:', error);
+      // Create empty root on error
+      this.updateState({
+        rootWidget: this.createEmptyRoot()
+      });
+    }
+  });
+}
+
+/**
+ * Recursively normalizes the 'children' property of a FlutterWidget
+ * to ensure it's always an array. If 'children' is null or undefined,
+ * it's converted to an empty array.
+ */
+private normalizeWidgetChildren(widget: FlutterWidget): FlutterWidget {
+  // If widget.children is not an array, set it to an empty array
+  if (!Array.isArray(widget.children)) {
+    widget.children = [];
   }
+
+  // Recursively process children to ensure all nested widgets are also normalized
+  for (const child of widget.children) {
+    this.normalizeWidgetChildren(child);
+  }
+
+  return widget;
+}
 
   // Save current state to backend
   saveToBackend(): Observable<any> {
@@ -144,17 +170,17 @@ export class CanvasStateService {
 
   // Create empty root widget
   private createEmptyRoot(): FlutterWidget {
-    return {
-      id: uuidv4(),
-      type: WidgetType.CONTAINER,
-      properties: {
-        width: undefined,
-        height: undefined,
-        color: '#FFFFFF'
-      },
-      children: []
-    };
-  }
+  return {
+    id: uuidv4(),
+    type: WidgetType.CONTAINER,
+    properties: {
+      width: undefined,
+      height: undefined,
+      color: '#FFFFFF'
+    },
+    children: [] // Always ensure this is an array
+  };
+}
 
   // Get current screen ID
   getCurrentScreenId(): number | null {

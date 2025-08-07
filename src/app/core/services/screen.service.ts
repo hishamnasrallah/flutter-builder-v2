@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
+import { map } from 'rxjs/operators';
 
 interface Screen {
   id: number;
@@ -19,10 +20,29 @@ interface Screen {
 export class ScreenService {
   constructor(private api: ApiService) {}
 
-  getScreens(projectId: number): Observable<Screen[]> {
-    return this.api.get<Screen[]>('api/projects/screens/', { project: projectId });
-  }
-
+getScreens(projectId: number): Observable<Screen[]> {
+  return this.api.get<any>('api/projects/screens/', { project: projectId }).pipe(
+    map(response => {
+      // Check if the response is directly an array
+      if (Array.isArray(response)) {
+        return response as Screen[];
+      }
+      // Check if the response is an object with a 'results' property (common for paginated APIs)
+      else if (response && Array.isArray(response.results)) {
+        return response.results as Screen[];
+      }
+      // Check if the response is an object with a 'data' property (another common wrapper)
+      else if (response && Array.isArray(response.data)) {
+        return response.data as Screen[];
+      }
+      // If none of the above, or if response is null/undefined, return an empty array
+      else {
+        console.warn('ScreenService: Unexpected response format for getScreens, defaulting to empty array:', response);
+        return [] as Screen[];
+      }
+    })
+  );
+}
   getScreen(screenId: number): Observable<Screen> {
     return this.api.get<Screen>(`api/projects/screens/${screenId}/`);
   }
