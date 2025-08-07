@@ -11,6 +11,7 @@ import {
 import { CanvasStateService, CanvasState, DragData } from '../../../../core/services/canvas-state.service';
 import { WidgetTreeService, TreeNode } from '../../../../core/services/widget-tree.service';
 import { WidgetRegistryService } from '../../../../core/services/widget-registry.service';
+import { SelectionService } from '../../../../core/services/selection.service';
 
 @Component({
   selector: 'app-widget-tree',
@@ -51,6 +52,7 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
             </svg>
             <p class="text-sm text-gray-500 mt-2">No widgets in tree</p>
             <p class="text-xs text-gray-400 mt-1">Drag widgets from palette to canvas</p>
+
           </div>
         }
 
@@ -62,12 +64,13 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
 
           @for (node of treeNodes; track node.widget.id) {
             <div
+
               class="tree-node"
               [class.selected]="node.widget.id === selectedWidgetId"
               [style.padding-left.px]="node.level * 20 + 8"
               cdkDrag
               [cdkDragData]="createDragData(node.widget)"
-              (click)="selectWidget(node.widget.id)">
+              (click)="selectWidget(node.widget.id, $event)">
 
               <!-- Expand/Collapse Toggle -->
               @if (node.hasChildren) {
@@ -97,7 +100,11 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
                 }
                 @if (node.widget.id === selectedWidgetId) {
                   <span class="selected-badge">selected</span>
+                }@if (selectionService.isSelected(node.widget.id)) {
+                  <span class="selected-indicator">✓</span>
                 }
+
+
               </div>
 
               <!-- Actions -->
@@ -274,7 +281,9 @@ export class WidgetTreeComponent implements OnInit, OnDestroy {
   constructor(
     private canvasState: CanvasStateService,
     private treeService: WidgetTreeService,
-    private widgetRegistry: WidgetRegistryService
+    private widgetRegistry: WidgetRegistryService,
+    private selectionService: SelectionService
+
   ) {}
 
   ngOnInit() {
@@ -350,10 +359,10 @@ export class WidgetTreeComponent implements OnInit, OnDestroy {
     this.updateTree();
   }
 
-  selectWidget(widgetId: string) {
-    this.canvasState.selectWidget(widgetId);
+  selectWidget(widgetId: string, event?: MouseEvent) {
+    const isMultiSelect = event && (event.ctrlKey || event.metaKey);
+    this.selectionService.selectWidget(widgetId, isMultiSelect);
   }
-
   deleteWidget(widgetId: string, event: Event) {
     event.stopPropagation();
 

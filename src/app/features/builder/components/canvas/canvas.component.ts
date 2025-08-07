@@ -9,6 +9,7 @@ import { CanvasStateService, CanvasState, DragData } from '../../../../core/serv
 import { WidgetTreeService } from '../../../../core/services/widget-tree.service';
 import { FlutterWidget } from '../../../../core/models/flutter-widget.model';
 import { Subject, takeUntil } from 'rxjs';
+import { SelectionService } from '../../../../core/services/selection.service';
 
 @Component({
   selector: 'app-canvas',
@@ -88,6 +89,7 @@ import { Subject, takeUntil } from 'rxjs';
         <div class="device-frame">
           <div
             class="device-screen"
+            (click)="onCanvasClick($event)"
             (dragover)="onDragOver($event)"
             (drop)="onDrop($event)"
             (dragleave)="onDragLeave($event)"
@@ -271,9 +273,17 @@ export class CanvasComponent implements OnInit, OnDestroy {
   constructor(
     private widgetRegistry: WidgetRegistryService,
     private canvasState: CanvasStateService,
-    private treeService: WidgetTreeService
+    private treeService: WidgetTreeService,
+      private selectionService: SelectionService
   ) {}
-
+  // Add method for canvas background click
+  onCanvasClick(event: MouseEvent) {
+    // Clear selection if clicking on empty canvas
+    const target = event.target as HTMLElement;
+    if (target.classList.contains('device-screen')) {
+      this.selectionService.clearSelection();
+    }
+  }
   getConnectedLists(): string[] {
     // Connect to all palette lists
     return ['palette-Layout', 'palette-Basic', 'palette-Material', 'palette-Form', 'palette-Navigation'];

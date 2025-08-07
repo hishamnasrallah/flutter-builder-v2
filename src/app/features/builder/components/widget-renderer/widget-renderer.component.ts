@@ -2,7 +2,6 @@
 
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-
 import {
   FlutterWidget,
   WidgetType,
@@ -12,6 +11,7 @@ import {
 } from '../../../../core/models/flutter-widget.model';
 import { CanvasStateService, DragData } from '../../../../core/services/canvas-state.service';
 import { WidgetRegistryService } from '../../../../core/services/widget-registry.service';
+import { SelectionService } from '../../../../core/services/selection.service';
 
 @Component({
   selector: 'app-widget-renderer',
@@ -19,6 +19,7 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
   imports: [CommonModule],
   template: `
     <div
+      [attr.data-widget-id]="widget.id"
       [ngClass]="getWidgetClasses()"
       [ngStyle]="getWidgetStyles()"
       (click)="handleClick($event)"
@@ -384,6 +385,9 @@ import { WidgetRegistryService } from '../../../../core/services/widget-registry
     .drop-indicator-vertical.show {
       @apply opacity-100;
     }
+    .widget-multi-selected {
+      @apply outline outline-2 outline-purple-500 outline-offset-2 !important;
+    }
   `]
 })
 export class WidgetRendererComponent implements OnInit, OnChanges {
@@ -406,7 +410,8 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
 
   constructor(
     private canvasState: CanvasStateService,
-    private widgetRegistry: WidgetRegistryService
+    private widgetRegistry: WidgetRegistryService,
+    private selectionService: SelectionService
   ) {}
 
   ngOnInit() {
@@ -431,9 +436,23 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
   }
 
   handleClick(event: MouseEvent) {
-    event.stopPropagation();
-    this.widgetClick.emit(this.widget.id);
+  event.stopPropagation();
+
+  // Support multi-select with Ctrl/Cmd key
+  const isMultiSelect = event.ctrlKey || event.metaKey;
+
+  if (isMultiSelect) {
+    this.selectionService.selectWidget(this.widget.id, true);
+  } else {
+    this.selectionService.selectWidget(this.widget.id, false);
   }
+}
+
+  // Add method to check if widget is selected
+  get isMultiSelected(): boolean {
+    return this.selectionService.isSelected(this.widget.id);
+  }
+
 
   bubbleClick(widgetId: string) {
     this.widgetClick.emit(widgetId);
