@@ -10,9 +10,27 @@ import {
   CrossAxisAlignment,
   MainAxisSize,
   Alignment,
-  createEdgeInsets
+  createEdgeInsets,
+  FontWeight,
+  FontStyle,
+  TextAlign
 } from '../models/flutter-widget.model';
 import { v4 as uuidv4 } from 'uuid';
+
+interface BackendComponentTemplate {
+  flutter_widget: string;
+  name: string;
+  category: string;
+  icon: string;
+  description?: string; // Make this optional
+  default_properties: any;
+  can_have_children: boolean;
+  max_children?: number;
+  is_active: boolean;
+  widget_group?: string;
+  display_order?: number;
+  show_in_builder?: boolean;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -21,245 +39,240 @@ export class WidgetRegistryService {
   private widgetDefinitions: Map<WidgetType, WidgetDefinition> = new Map();
 
   constructor() {
-    this.initializeWidgetDefinitions();
+    // No static initialization here anymore
   }
 
-  private initializeWidgetDefinitions(): void {
-    // Layout Widgets
-    this.registerWidget({
-      type: WidgetType.CONTAINER,
-      displayName: 'Container',
-      icon: '□',
-      category: WidgetCategory.LAYOUT,
-      isContainer: true,
-      acceptsChildren: true,
-      maxChildren: 1,
-      defaultProperties: {
-        width: 200,
-        height: 200,
-        color: '#FFFFFF',
-        padding: createEdgeInsets(8),
-        alignment: Alignment.TOP_LEFT
-      }
-    });
+  // New method to register definitions from backend data
+  registerWidgetDefinition(template: BackendComponentTemplate): void {
+    const widgetType = this.normalizeBackendWidgetType(template.flutter_widget);
+    const category = this.mapBackendCategoryToFrontend(template.category);
+    const icon = this.mapBackendIconToFrontend(template.icon); // Map backend icon name to actual icon character/code
 
-    this.registerWidget({
-      type: WidgetType.COLUMN,
-      displayName: 'Column',
-      icon: '⬇',
-      category: WidgetCategory.LAYOUT,
-      isContainer: true,
-      acceptsChildren: true,
-      defaultProperties: {
-        mainAxisAlignment: MainAxisAlignment.START,
-        crossAxisAlignment: CrossAxisAlignment.CENTER,
-        mainAxisSize: MainAxisSize.MAX
-      }
-    });
-
-    this.registerWidget({
-      type: WidgetType.ROW,
-      displayName: 'Row',
-      icon: '➡',
-      category: WidgetCategory.LAYOUT,
-      isContainer: true,
-      acceptsChildren: true,
-      defaultProperties: {
-        mainAxisAlignment: MainAxisAlignment.START,
-        crossAxisAlignment: CrossAxisAlignment.CENTER,
-        mainAxisSize: MainAxisSize.MAX
-      }
-    });
-
-    this.registerWidget({
-      type: WidgetType.STACK,
-      displayName: 'Stack',
-      icon: '⬚',
-      category: WidgetCategory.LAYOUT,
-      isContainer: true,
-      acceptsChildren: true,
-      defaultProperties: {
-        alignment: Alignment.TOP_LEFT
-      }
-    });
-
-    this.registerWidget({
-      type: WidgetType.PADDING,
-      displayName: 'Padding',
-      icon: '▫',
-      category: WidgetCategory.LAYOUT,
-      isContainer: true,
-      acceptsChildren: true,
-      maxChildren: 1,
-      defaultProperties: {
-        padding: createEdgeInsets(16)
-      }
-    });
-
-    this.registerWidget({
-      type: WidgetType.CENTER,
-      displayName: 'Center',
-      icon: '⊕',
-      category: WidgetCategory.LAYOUT,
-      isContainer: true,
-      acceptsChildren: true,
-      maxChildren: 1,
-      defaultProperties: {}
-    });
-
-    this.registerWidget({
-      type: WidgetType.SIZED_BOX,
-      displayName: 'SizedBox',
-      icon: '▭',
-      category: WidgetCategory.LAYOUT,
-      isContainer: true,
-      acceptsChildren: true,
-      maxChildren: 1,
-      defaultProperties: {
-        width: 100,
-        height: 100
-      }
-    });
-
-    // Basic Widgets
-    this.registerWidget({
-      type: WidgetType.TEXT,
-      displayName: 'Text',
-      icon: 'T',
-      category: WidgetCategory.BASIC,
-      isContainer: false,
-      acceptsChildren: false,
-      defaultProperties: {
-        text: 'Hello World',
-        fontSize: 16,
-        textColor: '#000000'
-      }
-    });
-
-    // Material Widgets
-    this.registerWidget({
-      type: WidgetType.SCAFFOLD,
-      displayName: 'Scaffold',
-      icon: '📱',
-      category: WidgetCategory.MATERIAL,
-      isContainer: true,
-      acceptsChildren: true,
-      defaultProperties: {
-        color: '#FFFFFF'
-      }
-    });
-
-    this.registerWidget({
-      type: WidgetType.APP_BAR,
-      displayName: 'AppBar',
-      icon: '━',
-      category: WidgetCategory.MATERIAL,
-      isContainer: false,
-      acceptsChildren: false,
-      defaultProperties: {
-        title: 'App Title',
-        backgroundColor: '#2196F3',
-        elevation: 4
-      }
-    });
-
-    // Card Widget
-    this.registerWidget({
-      type: WidgetType.CARD,
-      displayName: 'Card',
-      icon: '🎴',
-      category: WidgetCategory.MATERIAL,
-      isContainer: true,
-      acceptsChildren: true,
-      maxChildren: 1,
-      defaultProperties: {
-        elevation: 4,
-        color: '#FFFFFF',
-        borderRadius: 8,
-        padding: createEdgeInsets(16),
-        margin: createEdgeInsets(8)
-      }
-    });
-
-    // Icon Widget
-    this.registerWidget({
-      type: WidgetType.ICON,
-      displayName: 'Icon',
-      icon: '✦',
-      category: WidgetCategory.BASIC,
-      isContainer: false,
-      acceptsChildren: false,
-      defaultProperties: {
-        icon: 'star',
-        size: 24,
-        color: '#000000'
-      }
-    });
-
-    // ListView Widget
-    this.registerWidget({
-      type: WidgetType.LIST_VIEW,
-      displayName: 'ListView',
-      icon: '📋',
-      category: WidgetCategory.LAYOUT,
-      isContainer: true,
-      acceptsChildren: true,
-      defaultProperties: {
-        scrollDirection: 'vertical',
-        height: 300,
-        padding: createEdgeInsets(0)
-      }
-    });
-
-    // Expanded Widget
-    this.registerWidget({
-      type: WidgetType.EXPANDED,
-      displayName: 'Expanded',
-      icon: '↔',
-      category: WidgetCategory.LAYOUT,
-      isContainer: true,
-      acceptsChildren: true,
-      maxChildren: 1,
-      defaultProperties: {
-        flex: 1
-      }
-    });
-
-    // TextField Widget
-    this.registerWidget({
-      type: WidgetType.TEXT_FIELD,
-      displayName: 'TextField',
-      icon: '📝',
-      category: WidgetCategory.FORM,
-      isContainer: false,
-      acceptsChildren: false,
-      defaultProperties: {
-        hintText: 'Enter text...',
-        text: '',
-        fontSize: 16,
-        color: '#000000',
-        backgroundColor: '#FFFFFF',
-        borderColor: '#D1D5DB',
-        borderWidth: 1,
-        borderRadius: 6,
-        autofocus: false
-      }
-    });
+    const definition: WidgetDefinition = {
+      type: widgetType,
+      displayName: template.name,
+      icon: icon,
+      category: category,
+      isContainer: template.can_have_children, // Assuming can_have_children implies container
+      acceptsChildren: template.can_have_children,
+      maxChildren: template.max_children,
+      defaultProperties: this.parseBackendProperties(template.default_properties, widgetType)
+    };
+    this.widgetDefinitions.set(widgetType, definition);
   }
 
-  private registerWidget(definition: WidgetDefinition): void {
-    this.widgetDefinitions.set(definition.type, definition);
+  // Helper to normalize backend widget type string to WidgetType enum
+  public normalizeBackendWidgetType(backendType: string): WidgetType {
+    // Convert backend's snake_case or lowercase to PascalCase for WidgetType enum
+    // Example: 'text_field' -> 'TextField', 'container' -> 'Container'
+    const pascalCaseType = backendType.split('_')
+                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                                    .join('');
+    // Use a direct mapping if PascalCase doesn't match enum exactly
+    const directMap: { [key: string]: WidgetType } = {
+      'Textfield': WidgetType.TEXT_FIELD,
+      'Elevatedbutton': WidgetType.ELEVATED_BUTTON,
+      'Textbutton': WidgetType.TEXT_BUTTON,
+      'Outlinedbutton': WidgetType.OUTLINED_BUTTON,
+      'Iconbutton': WidgetType.ICON_BUTTON,
+      'Floatingactionbutton': WidgetType.FAB,
+      'Textformfield': WidgetType.TEXT_FORM_FIELD,
+      'Listview': WidgetType.LIST_VIEW,
+      'Gridview': WidgetType.GRID_VIEW,
+      'Circleavatar': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
+      'Navigatablecontainer': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
+      'Navigatabletext': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
+      'Navigatablecard': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
+      'Navigatableicon': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
+      'Navigatablebutton': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
+      'Navigatablecolumn': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
+      'Singlechildscrollview': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
+      'Expanded': WidgetType.EXPANDED,
+      'Flexible': WidgetType.FLEXIBLE,
+      'Wrap': WidgetType.WRAP,
+      'Aspectratio': WidgetType.ASPECT_RATIO,
+      'Fittedbox': WidgetType.FITTED_BOX,
+      'Listtile': WidgetType.LIST_TILE,
+      'Checkbox': WidgetType.CHECKBOX,
+      'Radio': WidgetType.RADIO,
+      'Switch': WidgetType.SWITCH,
+      'Slider': WidgetType.SLIDER,
+      'Dropdownbutton': WidgetType.DROPDOWN_BUTTON,
+      'Circularprogressindicator': WidgetType.CIRCULAR_PROGRESS,
+      'Linearprogressindicator': WidgetType.LINEAR_PROGRESS,
+      'Drawer': WidgetType.DRAWER,
+      'Bottomnavigationbar': WidgetType.BOTTOM_NAV_BAR,
+      'Tabbar': WidgetType.TAB_BAR,
+      'Popupmenubutton': WidgetType.POPUP_MENU,
+      'Tooltip': WidgetType.TOOLTIP,
+      'Form': WidgetType.FORM,
+      'Divider': WidgetType.DIVIDER,
+      'Card': WidgetType.CARD,
+      'Image': WidgetType.IMAGE,
+      'Icon': WidgetType.ICON,
+      // Add more mappings as needed for your specific backend types
+    };
+
+    return directMap[pascalCaseType] || (pascalCaseType as WidgetType);
   }
 
-getWidgetDefinition(type: WidgetType): WidgetDefinition | undefined {
-  console.log('WidgetRegistryService: Looking for definition for type:', type);
-  const definition = this.widgetDefinitions.get(type);
-  console.log('WidgetRegistryService: Found definition:', definition ? 'Yes' : 'No');
-  if (!definition) {
-    console.log('WidgetRegistryService: Available types:', Array.from(this.widgetDefinitions.keys()));
+  // Helper to map backend category strings to frontend WidgetCategory enum
+  private mapBackendCategoryToFrontend(backendCategory: string): WidgetCategory {
+    switch (backendCategory.toLowerCase()) {
+      case 'layout': return WidgetCategory.LAYOUT;
+      case 'display': return WidgetCategory.BASIC; // Basic for general display widgets
+      case 'input': return WidgetCategory.FORM;
+      case 'navigation': return WidgetCategory.NAVIGATION;
+      case 'material': return WidgetCategory.MATERIAL;
+      // Add more mappings as needed
+      default: return WidgetCategory.BASIC;
+    }
   }
-  return definition;
-}
+
+  // Helper to map backend icon names to actual icon characters/codes
+  private mapBackendIconToFrontend(backendIconName: string): string {
+    // This is a simplified mapping. You might need a comprehensive map
+    // or use a font icon library (like Material Icons) directly in your HTML.
+    const iconMap: { [key: string]: string } = {
+      'crop_square': '□', 'view_column': '⬇', 'view_stream': '➡', 'layers': '⬚',
+      'center_focus_strong': '⊕', 'format_indent_increase': '▫', 'unfold_more': '↔',
+      'crop_din': '▭', 'text_fields': 'T', 'image': '🖼️', 'insert_emoticon': '✦',
+      'refresh': '⟳', 'linear_scale': '▬▬▬', 'horizontal_rule': '─', 'label': '🏷️',
+      'smart_button': '🔘', 'text_snippet': '📄', 'crop_16_9': '🔳', 'touch_app': '👆',
+      'add_circle': '➕', 'input': '📝', 'edit_note': '✍️', 'check_box': '✅',
+      'toggle_on': '💡', 'radio_button_checked': '◉', 'tune': '🎚️', 'arrow_drop_down': '🔽',
+      'credit_card': '💳', 'list_alt': '📋', 'dashboard': '🏠', 'web_asset': '🌐',
+      'menu': '☰', 'navigation': '🗺️', 'tab': '🗂️', 'announcement': '📢',
+      'warning': '⚠️', 'vertical_align_bottom': '⬇️', 'expand_more': '⬇️',
+      'format_list_numbered': '🔢', 'opacity': '👻', 'transform': '🔄',
+      'visibility': '👁️', 'grid_on': '▦', 'list': '☰', 'dynamic_form': '📝',
+      'verified': '✔️', 'account_circle': '👤', 'swap_vert': '↕️', 'grid_view': '🖼️',
+      'drag_handle': '✋', 'timeline': '📈', 'blur_on': '🌫️', 'format_paint': '🖌️',
+      'campaign': '📣', 'view_sidebar': '➡️', 'view_carousel': '🎠', 'view_quilt': '🧩',
+      'brush': '🖌️', 'block': '🚫', 'height': '📏', 'width': '📐', 'crop_free': '✂️',
+      'fullscreen': '📺', 'more_vert': '⋮', 'checklist': '✅', 'filter_alt': '🎛️',
+      'view_week': '🗓️', 'phone_android': '📱', 'shopping_bag': '🛍️', 'face': '😊',
+      'sports_soccer': '⚽', 'home': '🏠', 'menu_book': '📚', 'toys': '🧸',
+      'shopping_basket': '🧺', 'directions_car': '🚗', 'favorite': '❤️', 'music_note': '🎵',
+      'pets': '🐾', 'laptop': '💻', 'camera_alt': '📷', 'headphones': '🎧',
+      'watch': '⌚', 'headset': '🎧', 'local_shipping': '🚚', 'local_offer': '🏷️',
+      'arrow_forward_ios': '➡️', 'check_circle': '✅', 'remove_circle_outline': '➖',
+      'add_circle_outline': '➕', 'delete_outline': '🗑️', 'lock': '🔒', 'radio_button_unchecked': '⚪',
+      'notifications': '🔔', 'visibility_off': '🚫', 'help': '❓', 'error_outline': '❗',
+      'logout': '🚪', 'email': '📧', 'access_time': '⏰', 'sort': '⇅', 'tune': '🎛️',
+      'checkroom': '👕', 'phone': '📞', 'location_on': '📍', 'check_box_outline_blank': '⬜'
+    };
+    return iconMap[backendIconName.toLowerCase()] || '?';
+  }
+
+  // Helper to parse backend property strings into frontend types
+  private parseBackendProperties(backendProps: any, widgetType: WidgetType): any {
+    const parsedProps: any = {};
+    for (const key in backendProps) {
+      if (backendProps.hasOwnProperty(key)) {
+        let value = backendProps[key];
+
+        // Handle specific known string formats from backend
+        if (typeof value === 'string') {
+          if (value.startsWith('Colors.')) {
+            // Simple color mapping (e.g., 'Colors.blue' -> '#2196F3')
+            parsedProps[key] = this.mapFlutterColorToHex(value);
+          } else if (value.startsWith('EdgeInsets.all(')) {
+            const num = parseFloat(value.match(/\d+(\.\d+)?/)![0]);
+            parsedProps[key] = createEdgeInsets(num);
+          } else if (value.startsWith('EdgeInsets.symmetric(')) {
+            const match = value.match(/horizontal:\s*(\d+(\.\d+)?),\s*vertical:\s*(\d+(\.\d+)?)/);
+            if (match) {
+              parsedProps[key] = createEdgeInsets({
+                left: parseFloat(match[1]),
+                right: parseFloat(match[1]),
+                top: parseFloat(match[3]),
+                bottom: parseFloat(match[3])
+              });
+            } else {
+              parsedProps[key] = createEdgeInsets(0); // Fallback
+            }
+          } else if (value.startsWith('MainAxisAlignment.')) {
+            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'MainAxisAlignment.center' -> 'center'
+          } else if (value.startsWith('CrossAxisAlignment.')) {
+            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'CrossAxisAlignment.start' -> 'start'
+          } else if (value.startsWith('MainAxisSize.')) {
+            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'MainAxisSize.min' -> 'min'
+          } else if (value.startsWith('Alignment.')) {
+            parsedProps[key] = value.split('.')[1]; // 'Alignment.topLeft' -> 'topLeft'
+          } else if (value.startsWith('FontWeight.')) {
+            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'FontWeight.bold' -> 'bold'
+          } else if (value.startsWith('FontStyle.')) {
+            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'FontStyle.italic' -> 'italic'
+          } else if (value.startsWith('TextAlign.')) {
+            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'TextAlign.center' -> 'center'
+          } else if (value.startsWith('Icons.')) {
+            parsedProps[key] = value.split('.')[1]; // 'Icons.search' -> 'search'
+          } else if (value === 'true' || value === 'false') {
+            parsedProps[key] = (value === 'true');
+          } else if (!isNaN(Number(value)) && !isNaN(parseFloat(value))) {
+            parsedProps[key] = parseFloat(value);
+          } else if (value.startsWith('TextStyle(') || value.startsWith('InputDecoration(') || value.startsWith('BoxDecoration(') || value.startsWith('ElevatedButton.styleFrom(') || value.startsWith('RoundedRectangleBorder(')) {
+            // For complex Flutter objects, store as string for now or parse more deeply if needed
+            // For simplicity, we'll just store the raw string for now if not directly handled by a specific editor
+            parsedProps[key] = value;
+          } else {
+            parsedProps[key] = value; // Keep as is if no specific parsing rule
+          }
+        } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          // Recursively parse nested objects (e.g., 'margin', 'padding' if they are objects)
+          parsedProps[key] = this.parseBackendProperties(value, widgetType);
+        } else {
+          parsedProps[key] = value;
+        }
+      }
+    }
+    return parsedProps;
+  }
+
+  // Simplified Flutter Color to Hex mapping
+  private mapFlutterColorToHex(flutterColor: string): string {
+    const colorMap: { [key: string]: string } = {
+      'Colors.blue': '#2196F3',
+      'Colors.white': '#FFFFFF',
+      'Colors.black': '#000000',
+      'Colors.grey': '#9E9E9E',
+      'Colors.red': '#F44336',
+      'Colors.green': '#4CAF50',
+      'Colors.orange': '#FF9800',
+      'Colors.yellow': '#FFEB3B',
+      'Colors.purple': '#9C27B0',
+      'Colors.pink': '#E91E63',
+      'Colors.teal': '#009688',
+      'Colors.indigo': '#3F51B5',
+      'Colors.cyan': '#00BCD4',
+      'Colors.amber': '#FFC107',
+      'Colors.deepOrange': '#FF5722',
+      'Colors.blueGrey': '#607D8B',
+      'Colors.brown': '#795548',
+      'Colors.lightBlue': '#03A9F4',
+      'Colors.lightGreen': '#8BC34A',
+      'Colors.lime': '#CDDC39',
+      'Colors.deepPurple': '#673AB7',
+      'Colors.transparent': 'transparent',
+      'Colors.black54': 'rgba(0,0,0,0.54)', // Example for opacity
+      'Colors.grey[200]': '#EEEEEE',
+      'Colors.grey[300]': '#E0E0E0',
+      'Colors.grey[400]': '#BDBDBD',
+      'Colors.grey[500]': '#9E9E9E',
+      'Colors.grey[600]': '#757575',
+      'Colors.grey[700]': '#616161',
+      'Colors.grey[800]': '#424242',
+      'Colors.grey[900]': '#212121',
+      // Add more shades as needed
+    };
+    return colorMap[flutterColor] || '#000000'; // Default to black if not found
+  }
+
+  // Existing methods (keep as is, they will now use dynamic definitions)
+  getWidgetDefinition(type: WidgetType): WidgetDefinition | undefined {
+    return this.widgetDefinitions.get(type);
+  }
 
   getAllWidgetDefinitions(): WidgetDefinition[] {
     return Array.from(this.widgetDefinitions.values());
@@ -270,115 +283,17 @@ getWidgetDefinition(type: WidgetType): WidgetDefinition | undefined {
   }
 
   createWidget(type: WidgetType, properties?: Partial<FlutterWidget['properties']>): FlutterWidget {
-  console.log('WidgetRegistryService: createWidget called for type:', type, '(typeof:', typeof type, ')');
-
-  if (!type || typeof type !== 'string') {
-    console.error('WidgetRegistryService: Invalid widget type provided to createWidget:', type);
-    console.error('  - type value:', type);
-    console.error('  - type typeof:', typeof type);
-    console.error('  - type is null:', type === null);
-    console.error('  - type is undefined:', type === undefined);
-    throw new Error(`Invalid widget type provided: ${type}`);
-  }
-
-  console.log('WidgetRegistryService: Looking for definition for valid type:', type);
-  const definition = this.getWidgetDefinition(type);
-
-  if (!definition) {
-    console.error('WidgetRegistryService: No definition found for type:', type);
-    console.error('Available widget types:', Array.from(this.widgetDefinitions.keys()));
-    throw new Error(`Unknown widget type: ${type}`);
-  }
-
-  console.log('WidgetRegistryService: Successfully found definition:', definition);
-
-  const widget = {
-    id: uuidv4(),
-    type,
-    properties: { ...definition.defaultProperties, ...properties },
-    children: []
-  };
-  console.log('WidgetRegistryService: Created widget:', widget);
-  return widget;
-}
-
-  // Create a sample widget tree for Phase 1
-  createSampleWidgetTree(): FlutterWidget {
-    const scaffold = this.createWidget(WidgetType.SCAFFOLD);
-
-    const column = this.createWidget(WidgetType.COLUMN, {
-      mainAxisAlignment: MainAxisAlignment.CENTER,
-      crossAxisAlignment: CrossAxisAlignment.CENTER
-    });
-
-    const container1 = this.createWidget(WidgetType.CONTAINER, {
-      width: 300,
-      height: 100,
-      color: '#E3F2FD',
-      padding: createEdgeInsets(16),
-      decoration: {
-        borderRadius: 8,
-        border: {
-          color: '#2196F3',
-          width: 2,
-          style: 'solid'
-        }
-      }
-    });
-
-    const text1 = this.createWidget(WidgetType.TEXT, {
-      text: 'Welcome to Flutter Builder',
-      fontSize: 24,
-      textColor: '#1976D2'
-    });
-
-    const row = this.createWidget(WidgetType.ROW, {
-      mainAxisAlignment: MainAxisAlignment.SPACE_AROUND
-    });
-
-    const container2 = this.createWidget(WidgetType.CONTAINER, {
-      width: 80,
-      height: 80,
-      color: '#C8E6C9',
-      decoration: {
-        borderRadius: 40
-      }
-    });
-
-    const container3 = this.createWidget(WidgetType.CONTAINER, {
-      width: 80,
-      height: 80,
-      color: '#FFCCBC',
-      decoration: {
-        borderRadius: 8
-      }
-    });
-
-    const text2 = this.createWidget(WidgetType.TEXT, {
-      text: 'Build beautiful UIs',
-      fontSize: 18,
-      textColor: '#424242'
-    });
-
-    // Build the tree structure
-    container1.children.push(text1);
-    row.children.push(container2, container3);
-    column.children.push(container1, row, text2);
-    scaffold.children.push(column);
-
-    // Set parent references
-    this.updateParentReferences(scaffold);
-
-    return scaffold;
-  }
-
-  private updateParentReferences(widget: FlutterWidget, parentId?: string): void {
-    if (parentId) {
-      widget.parent = parentId;
+    const definition = this.getWidgetDefinition(type);
+    if (!definition) {
+      throw new Error(`Unknown widget type: ${type}`);
     }
-    widget.children.forEach(child => {
-      this.updateParentReferences(child, widget.id);
-    });
+
+    return {
+      id: uuidv4(),
+      type,
+      properties: { ...definition.defaultProperties, ...properties },
+      children: []
+    };
   }
 
   isContainer(type: WidgetType): boolean {
@@ -395,72 +310,36 @@ getWidgetDefinition(type: WidgetType): WidgetDefinition | undefined {
     const definition = this.getWidgetDefinition(type);
     return definition?.maxChildren;
   }
-  // Add support for dynamic widget creation from backend template
-  createWidgetFromTemplate(template: any): FlutterWidget {
-    const widgetType = template.widget_type as WidgetType;
 
-    // Check if we have a definition for this type
-    let definition = this.getWidgetDefinition(widgetType);
+  // Keep createSampleWidgetTree for initial canvas load if no screen is selected
+  createSampleWidgetTree(): FlutterWidget {
+    // This method can remain for initial setup or be removed if all screens are from backend
+    // For now, let's keep it as a fallback or initial state.
+    // Ensure it uses dynamically registered widgets if possible, or basic ones.
+    const scaffold = this.createWidget(WidgetType.SCAFFOLD);
+    const column = this.createWidget(WidgetType.COLUMN, {
+      mainAxisAlignment: MainAxisAlignment.CENTER,
+      crossAxisAlignment: CrossAxisAlignment.CENTER
+    });
+    const text = this.createWidget(WidgetType.TEXT, { text: 'Welcome to Flutter Builder' });
+    const container = this.createWidget(WidgetType.CONTAINER, { width: 200, height: 200, color: '#E3F2FD' });
 
-    // If not found, create a temporary definition
-    if (!definition) {
-      definition = {
-        type: widgetType,
-        displayName: template.name,
-        icon: '?',
-        category: WidgetCategory.BASIC,
-        isContainer: template.is_container || false,
-        acceptsChildren: template.is_container || false,
-        maxChildren: template.max_children,
-        defaultProperties: template.properties || {}
-      };
+    container.children.push(text);
+    column.children.push(container);
+    scaffold.children.push(column);
 
-      // Temporarily register this widget type
-      this.registerWidget(definition);
+    // Update parent references (important for tree structure)
+    this.updateParentReferences(scaffold);
+
+    return scaffold;
+  }
+
+  private updateParentReferences(widget: FlutterWidget, parentId?: string): void {
+    if (parentId) {
+      widget.parent = parentId;
     }
-
-    return {
-      id: uuidv4(),
-      type: widgetType,
-      properties: { ...template.properties },
-      children: []
-    };
-  }
-
-  // Method to register dynamic widget types from backend
-  registerDynamicWidgetType(template: any): void {
-  const widgetType = template.widget_type as WidgetType;
-  console.log('WidgetRegistryService: Registering dynamic widget type:', widgetType, 'from template:', template);
-
-  // Only register if not already registered
-  if (!this.widgetDefinitions.has(widgetType)) {
-    const definition: WidgetDefinition = {
-      type: widgetType,
-      displayName: template.name,
-      icon: template.icon || '?',
-      category: this.mapTemplateCategory(template.category),
-      isContainer: template.is_container || false,
-      acceptsChildren: template.is_container || false,
-      maxChildren: template.max_children,
-      defaultProperties: template.properties || {}
-    };
-
-    console.log('WidgetRegistryService: Registering new definition:', definition);
-    this.registerWidget(definition);
-  } else {
-    console.log('WidgetRegistryService: Widget type already registered:', widgetType);
-  }
-}
-
-  private mapTemplateCategory(category: string): WidgetCategory {
-    const categoryMap: Record<string, WidgetCategory> = {
-      'layout': WidgetCategory.LAYOUT,
-      'display': WidgetCategory.BASIC,
-      'input': WidgetCategory.FORM,
-      'navigation': WidgetCategory.NAVIGATION,
-      'material': WidgetCategory.MATERIAL
-    };
-
-    return categoryMap[category.toLowerCase()] || WidgetCategory.BASIC;
+    widget.children.forEach(child => {
+      this.updateParentReferences(child, widget.id);
+    });
   }
 }

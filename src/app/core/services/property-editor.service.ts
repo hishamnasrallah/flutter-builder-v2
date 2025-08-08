@@ -1,7 +1,7 @@
 // src/app/core/services/property-editor.service.ts
-
-import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import {Injectable} from '@angular/core';
+import {BehaviorSubject, combineLatest} from 'rxjs';
+import {map, takeUntil} from 'rxjs/operators'; // Added map
 import {
   FlutterWidget,
   WidgetType,
@@ -12,11 +12,13 @@ import {
   MainAxisSize,
   FontWeight,
   FontStyle,
-  TextAlign
+  TextAlign,
+  EdgeInsets, // Import EdgeInsets
 } from '../models/flutter-widget.model';
-import { CanvasStateService } from './canvas-state.service';
-import { WidgetTreeService } from './widget-tree.service';
-import { NotificationService } from './notification.service';
+import {CanvasStateService} from './canvas-state.service';
+import {WidgetTreeService} from './widget-tree.service';
+import {NotificationService} from './notification.service';
+import {WidgetRegistryService} from './widget-registry.service'; // Import WidgetRegistryService
 
 export interface PropertyDefinition {
   key: string;
@@ -51,16 +53,15 @@ export interface PropertyCategory {
   providedIn: 'root'
 })
 export class PropertyEditorService {
-  private propertySchemas = new Map<WidgetType, PropertyDefinition[]>();
   private currentWidgetSubject = new BehaviorSubject<FlutterWidget | null>(null);
   public currentWidget$ = this.currentWidgetSubject.asObservable();
 
   constructor(
     private canvasState: CanvasStateService,
     private treeService: WidgetTreeService,
-    private notification: NotificationService
+    private notification: NotificationService,
+    private widgetRegistry: WidgetRegistryService // Inject WidgetRegistryService
   ) {
-    this.initializePropertySchemas();
     this.subscribeToSelection();
   }
 
@@ -70,604 +71,262 @@ export class PropertyEditorService {
     });
   }
 
-  private initializePropertySchemas() {
-    // Container Properties
-    this.propertySchemas.set(WidgetType.CONTAINER, [
-      // Layout Category
-      {
-        key: 'width',
-        label: 'Width',
-        type: 'number',
-        category: 'Layout',
-        defaultValue: 200,
-        min: 0,
-        max: 1000,
-        step: 10,
-        unit: 'px',
-        validation: [
-          { type: 'min', value: 0, message: 'Width must be positive' }
-        ]
-      },
-      {
-        key: 'height',
-        label: 'Height',
-        type: 'number',
-        category: 'Layout',
-        defaultValue: 200,
-        min: 0,
-        max: 1000,
-        step: 10,
-        unit: 'px',
-        validation: [
-          { type: 'min', value: 0, message: 'Height must be positive' }
-        ]
-      },
-      {
-        key: 'alignment',
-        label: 'Alignment',
-        type: 'alignment',
-        category: 'Layout',
-        defaultValue: Alignment.TOP_LEFT,
-        options: Object.entries(Alignment).map(([key, value]) => ({
-          label: key.replace(/_/g, ' ').toLowerCase(),
-          value
-        }))
-      },
-      // Spacing Category
-      {
-        key: 'padding',
-        label: 'Padding',
-        type: 'spacing',
-        category: 'Spacing',
-        defaultValue: { top: 8, right: 8, bottom: 8, left: 8 }
-      },
-      {
-        key: 'margin',
-        label: 'Margin',
-        type: 'spacing',
-        category: 'Spacing',
-        defaultValue: { top: 0, right: 0, bottom: 0, left: 0 }
-      },
-      // Appearance Category
-      {
-        key: 'color',
-        label: 'Background Color',
-        type: 'color',
-        category: 'Appearance',
-        defaultValue: '#FFFFFF'
-      },
-      {
-        key: 'decoration.borderRadius',
-        label: 'Border Radius',
-        type: 'number',
-        category: 'Appearance',
-        defaultValue: 0,
-        min: 0,
-        max: 100,
-        step: 1,
-        unit: 'px'
-      },
-      {
-        key: 'decoration.border.width',
-        label: 'Border Width',
-        type: 'number',
-        category: 'Appearance',
-        defaultValue: 0,
-        min: 0,
-        max: 20,
-        step: 1,
-        unit: 'px'
-      },
-      {
-        key: 'decoration.border.color',
-        label: 'Border Color',
-        type: 'color',
-        category: 'Appearance',
-        defaultValue: '#000000',
-        dependsOn: ['decoration.border.width']
-      }
-    ]);
-
-    // Text Properties
-    this.propertySchemas.set(WidgetType.TEXT, [
-      {
-        key: 'text',
-        label: 'Text Content',
-        type: 'text',
-        category: 'Content',
-        defaultValue: 'Hello World',
-        validation: [
-          { type: 'required', message: 'Text cannot be empty' }
-        ]
-      },
-      {
-        key: 'fontSize',
-        label: 'Font Size',
-        type: 'number',
-        category: 'Typography',
-        defaultValue: 16,
-        min: 8,
-        max: 72,
-        step: 1,
-        unit: 'px'
-      },
-      {
-        key: 'textColor',
-        label: 'Text Color',
-        type: 'color',
-        category: 'Typography',
-        defaultValue: '#000000'
-      },
-      {
-        key: 'fontWeight',
-        label: 'Font Weight',
-        type: 'select',
-        category: 'Typography',
-        defaultValue: FontWeight.W400,
-        options: [
-          { label: 'Thin (100)', value: FontWeight.W100 },
-          { label: 'Light (300)', value: FontWeight.W300 },
-          { label: 'Normal (400)', value: FontWeight.W400 },
-          { label: 'Medium (500)', value: FontWeight.W500 },
-          { label: 'Bold (700)', value: FontWeight.W700 },
-          { label: 'Black (900)', value: FontWeight.W900 }
-        ]
-      },
-      {
-        key: 'fontStyle',
-        label: 'Font Style',
-        type: 'select',
-        category: 'Typography',
-        defaultValue: FontStyle.NORMAL,
-        options: [
-          { label: 'Normal', value: FontStyle.NORMAL },
-          { label: 'Italic', value: FontStyle.ITALIC }
-        ]
-      },
-      {
-        key: 'textAlign',
-        label: 'Text Align',
-        type: 'select',
-        category: 'Typography',
-        defaultValue: TextAlign.LEFT,
-        options: [
-          { label: 'Left', value: TextAlign.LEFT },
-          { label: 'Center', value: TextAlign.CENTER },
-          { label: 'Right', value: TextAlign.RIGHT },
-          { label: 'Justify', value: TextAlign.JUSTIFY }
-        ]
-      }
-    ]);
-
-    // Column Properties
-    this.propertySchemas.set(WidgetType.COLUMN, [
-      {
-        key: 'mainAxisAlignment',
-        label: 'Main Axis Alignment',
-        type: 'select',
-        category: 'Layout',
-        defaultValue: MainAxisAlignment.START,
-        options: [
-          { label: 'Start', value: MainAxisAlignment.START },
-          { label: 'End', value: MainAxisAlignment.END },
-          { label: 'Center', value: MainAxisAlignment.CENTER },
-          { label: 'Space Between', value: MainAxisAlignment.SPACE_BETWEEN },
-          { label: 'Space Around', value: MainAxisAlignment.SPACE_AROUND },
-          { label: 'Space Evenly', value: MainAxisAlignment.SPACE_EVENLY }
-        ]
-      },
-      {
-        key: 'crossAxisAlignment',
-        label: 'Cross Axis Alignment',
-        type: 'select',
-        category: 'Layout',
-        defaultValue: CrossAxisAlignment.CENTER,
-        options: [
-          { label: 'Start', value: CrossAxisAlignment.START },
-          { label: 'End', value: CrossAxisAlignment.END },
-          { label: 'Center', value: CrossAxisAlignment.CENTER },
-          { label: 'Stretch', value: CrossAxisAlignment.STRETCH },
-          { label: 'Baseline', value: CrossAxisAlignment.BASELINE }
-        ]
-      },
-      {
-        key: 'mainAxisSize',
-        label: 'Main Axis Size',
-        type: 'select',
-        category: 'Layout',
-        defaultValue: MainAxisSize.MAX,
-        options: [
-          { label: 'Min', value: MainAxisSize.MIN },
-          { label: 'Max', value: MainAxisSize.MAX }
-        ]
-      }
-    ]);
-
-    // Row Properties (similar to Column)
-    this.propertySchemas.set(WidgetType.ROW, [
-      {
-        key: 'mainAxisAlignment',
-        label: 'Main Axis Alignment',
-        type: 'select',
-        category: 'Layout',
-        defaultValue: MainAxisAlignment.START,
-        options: [
-          { label: 'Start', value: MainAxisAlignment.START },
-          { label: 'End', value: MainAxisAlignment.END },
-          { label: 'Center', value: MainAxisAlignment.CENTER },
-          { label: 'Space Between', value: MainAxisAlignment.SPACE_BETWEEN },
-          { label: 'Space Around', value: MainAxisAlignment.SPACE_AROUND },
-          { label: 'Space Evenly', value: MainAxisAlignment.SPACE_EVENLY }
-        ]
-      },
-      {
-        key: 'crossAxisAlignment',
-        label: 'Cross Axis Alignment',
-        type: 'select',
-        category: 'Layout',
-        defaultValue: CrossAxisAlignment.CENTER,
-        options: [
-          { label: 'Start', value: CrossAxisAlignment.START },
-          { label: 'End', value: CrossAxisAlignment.END },
-          { label: 'Center', value: CrossAxisAlignment.CENTER },
-          { label: 'Stretch', value: CrossAxisAlignment.STRETCH },
-          { label: 'Baseline', value: CrossAxisAlignment.BASELINE }
-        ]
-      },
-      {
-        key: 'mainAxisSize',
-        label: 'Main Axis Size',
-        type: 'select',
-        category: 'Layout',
-        defaultValue: MainAxisSize.MAX,
-        options: [
-          { label: 'Min', value: MainAxisSize.MIN },
-          { label: 'Max', value: MainAxisSize.MAX }
-        ]
-      }
-    ]);
-
-    // Padding Properties
-    this.propertySchemas.set(WidgetType.PADDING, [
-      {
-        key: 'padding',
-        label: 'Padding',
-        type: 'spacing',
-        category: 'Spacing',
-        defaultValue: { top: 16, right: 16, bottom: 16, left: 16 }
-      }
-    ]);
-
-    // SizedBox Properties
-    this.propertySchemas.set(WidgetType.SIZED_BOX, [
-      {
-        key: 'width',
-        label: 'Width',
-        type: 'number',
-        category: 'Layout',
-        defaultValue: 100,
-        min: 0,
-        max: 1000,
-        step: 10,
-        unit: 'px'
-      },
-      {
-        key: 'height',
-        label: 'Height',
-        type: 'number',
-        category: 'Layout',
-        defaultValue: 100,
-        min: 0,
-        max: 1000,
-        step: 10,
-        unit: 'px'
-      }
-    ]);
-
-    // Scaffold Properties
-    this.propertySchemas.set(WidgetType.SCAFFOLD, [
-      {
-        key: 'color',
-        label: 'Background Color',
-        type: 'color',
-        category: 'Appearance',
-        defaultValue: '#FFFFFF'
-      }
-    ]);
-
-    // AppBar Properties
-    this.propertySchemas.set(WidgetType.APP_BAR, [
-      {
-        key: 'title',
-        label: 'Title',
-        type: 'text',
-        category: 'Content',
-        defaultValue: 'App Title'
-      },
-      {
-        key: 'backgroundColor',
-        label: 'Background Color',
-        type: 'color',
-        category: 'Appearance',
-        defaultValue: '#2196F3'
-      },
-      {
-        key: 'elevation',
-        label: 'Elevation',
-        type: 'number',
-        category: 'Appearance',
-        defaultValue: 4,
-        min: 0,
-        max: 24,
-        step: 1
-      }
-    ]);
-
-    // Stack Properties
-    this.propertySchemas.set(WidgetType.STACK, [
-      {
-        key: 'alignment',
-        label: 'Alignment',
-        type: 'alignment',
-        category: 'Layout',
-        defaultValue: Alignment.TOP_LEFT,
-        options: Object.entries(Alignment).map(([key, value]) => ({
-          label: key.replace(/_/g, ' ').toLowerCase(),
-          value
-        }))
-      }
-    ]);
-
-    // Center Properties - usually doesn't have specific properties
-    this.propertySchemas.set(WidgetType.CENTER, []);
-
-    // Card Properties
-    this.propertySchemas.set(WidgetType.CARD, [
-      {
-        key: 'elevation',
-        label: 'Elevation',
-        type: 'number',
-        category: 'Appearance',
-        defaultValue: 4,
-        min: 0,
-        max: 24,
-        step: 1
-      },
-      {
-        key: 'color',
-        label: 'Background Color',
-        type: 'color',
-        category: 'Appearance',
-        defaultValue: '#FFFFFF'
-      },
-      {
-        key: 'borderRadius',
-        label: 'Border Radius',
-        type: 'number',
-        category: 'Appearance',
-        defaultValue: 8,
-        min: 0,
-        max: 50,
-        step: 1,
-        unit: 'px'
-      },
-      {
-        key: 'margin',
-        label: 'Margin',
-        type: 'spacing',
-        category: 'Spacing',
-        defaultValue: { top: 8, right: 8, bottom: 8, left: 8 }
-      },
-      {
-        key: 'padding',
-        label: 'Padding',
-        type: 'spacing',
-        category: 'Spacing',
-        defaultValue: { top: 16, right: 16, bottom: 16, left: 16 }
-      }
-    ]);
-
-    // Icon Properties
-    this.propertySchemas.set(WidgetType.ICON, [
-      {
-        key: 'icon',
-        label: 'Icon Name',
-        type: 'select',
-        category: 'Content',
-        defaultValue: 'star',
-        options: [
-          { label: 'Star', value: 'star' },
-          { label: 'Heart', value: 'heart' },
-          { label: 'Home', value: 'home' },
-          { label: 'Settings', value: 'settings' },
-          { label: 'User', value: 'user' },
-          { label: 'Search', value: 'search' },
-          { label: 'Menu', value: 'menu' },
-          { label: 'Close', value: 'close' },
-          { label: 'Check', value: 'check' },
-          { label: 'Arrow Back', value: 'arrow_back' },
-          { label: 'Arrow Forward', value: 'arrow_forward' }
-        ]
-      },
-      {
-        key: 'size',
-        label: 'Size',
-        type: 'number',
-        category: 'Appearance',
-        defaultValue: 24,
-        min: 8,
-        max: 128,
-        step: 1,
-        unit: 'px'
-      },
-      {
-        key: 'color',
-        label: 'Color',
-        type: 'color',
-        category: 'Appearance',
-        defaultValue: '#000000'
-      }
-    ]);
-
-    // ListView Properties
-    this.propertySchemas.set(WidgetType.LIST_VIEW, [
-      {
-        key: 'scrollDirection',
-        label: 'Scroll Direction',
-        type: 'select',
-        category: 'Layout',
-        defaultValue: 'vertical',
-        options: [
-          { label: 'Vertical', value: 'vertical' },
-          { label: 'Horizontal', value: 'horizontal' }
-        ]
-      },
-      {
-        key: 'height',
-        label: 'Height',
-        type: 'number',
-        category: 'Layout',
-        defaultValue: 300,
-        min: 100,
-        max: 800,
-        step: 10,
-        unit: 'px'
-      },
-      {
-        key: 'padding',
-        label: 'Padding',
-        type: 'spacing',
-        category: 'Spacing',
-        defaultValue: { top: 0, right: 0, bottom: 0, left: 0 }
-      },
-      {
-        key: 'separatorHeight',
-        label: 'Item Spacing',
-        type: 'number',
-        category: 'Layout',
-        defaultValue: 0,
-        min: 0,
-        max: 50,
-        step: 1,
-        unit: 'px'
-      }
-    ]);
-
-    // Expanded Properties
-    this.propertySchemas.set(WidgetType.EXPANDED, [
-      {
-        key: 'flex',
-        label: 'Flex Factor',
-        type: 'number',
-        category: 'Layout',
-        defaultValue: 1,
-        min: 1,
-        max: 10,
-        step: 1
-      }
-    ]);
-
-    // TextField Properties
-    this.propertySchemas.set(WidgetType.TEXT_FIELD, [
-      {
-        key: 'hintText',
-        label: 'Hint Text',
-        type: 'text',
-        category: 'Content',
-        defaultValue: 'Enter text...'
-      },
-      {
-        key: 'text',
-        label: 'Initial Value',
-        type: 'text',
-        category: 'Content',
-        defaultValue: ''
-      },
-      {
-        key: 'fontSize',
-        label: 'Font Size',
-        type: 'number',
-        category: 'Typography',
-        defaultValue: 16,
-        min: 8,
-        max: 72,
-        step: 1,
-        unit: 'px'
-      },
-      {
-        key: 'color',
-        label: 'Text Color',
-        type: 'color',
-        category: 'Typography',
-        defaultValue: '#000000'
-      },
-      {
-        key: 'backgroundColor',
-        label: 'Background Color',
-        type: 'color',
-        category: 'Appearance',
-        defaultValue: '#FFFFFF'
-      },
-      {
-        key: 'borderColor',
-        label: 'Border Color',
-        type: 'color',
-        category: 'Appearance',
-        defaultValue: '#D1D5DB'
-      },
-      {
-        key: 'borderWidth',
-        label: 'Border Width',
-        type: 'number',
-        category: 'Appearance',
-        defaultValue: 1,
-        min: 0,
-        max: 5,
-        step: 1,
-        unit: 'px'
-      },
-      {
-        key: 'borderRadius',
-        label: 'Border Radius',
-        type: 'number',
-        category: 'Appearance',
-        defaultValue: 6,
-        min: 0,
-        max: 20,
-        step: 1,
-        unit: 'px'
-      },
-      {
-        key: 'autofocus',
-        label: 'Autofocus',
-        type: 'boolean',
-        category: 'Behavior',
-        defaultValue: false
-      }
-    ]);
-  }
-
+  // This method now dynamically generates properties based on the WidgetDefinition
   getPropertiesForWidget(widget: FlutterWidget | null): PropertyCategory[] {
     if (!widget) return [];
 
-    const schema = this.propertySchemas.get(widget.type) || [];
+    const definition = this.widgetRegistry.getWidgetDefinition(widget.type);
+    if (!definition) {
+      console.warn(`No widget definition found for type: ${widget.type}`);
+      return [];
+    }
+
     const categories = new Map<string, PropertyDefinition[]>();
 
-    // Group properties by category
-    schema.forEach(prop => {
-      if (!categories.has(prop.category)) {
-        categories.set(prop.category, []);
-      }
-      categories.get(prop.category)!.push(prop);
-    });
+    // Iterate over default_properties from the definition
+    for (const key in definition.defaultProperties) {
+      if (definition.defaultProperties.hasOwnProperty(key)) {
+        const defaultValue = definition.defaultProperties[key];
+        const propertyType = this.determinePropertyType(key, defaultValue);
+        const categoryName = this.determinePropertyCategory(key, widget.type); // Determine category dynamically
 
-    // Convert to PropertyCategory array
+        if (!categories.has(categoryName)) {
+          categories.set(categoryName, []);
+        }
+
+        // Create a basic PropertyDefinition. You'll need to expand this
+        // to include validation, options, min/max, etc., based on your needs.
+        // This is a simplified mapping.
+        const propDef: PropertyDefinition = {
+          key: key,
+          label: this.humanizePropertyLabel(key),
+          type: propertyType,
+          category: categoryName,
+          defaultValue: defaultValue,
+          // Add more specific properties like options, min, max, step, unit, validation, dependsOn
+          // based on your backend's `properties_mapping` or hardcoded rules for common types.
+          options: this.getOptionsForProperty(key),
+          min: this.getMinForProperty(key),
+          max: this.getMaxForProperty(key),
+          step: this.getStepForProperty(key),
+          unit: this.getUnitForProperty(key),
+          validation: this.getValidationForProperty(key),
+          dependsOn: this.getDependsOnForProperty(key)
+        };
+        categories.get(categoryName)!.push(propDef);
+      }
+    }
+
+    // Convert to PropertyCategory array and sort
     return Array.from(categories.entries()).map(([name, properties]) => ({
       name,
       icon: this.getCategoryIcon(name),
-      properties,
-      expanded: true
-    }));
+      properties: properties.sort((a, b) => a.label.localeCompare(b.label)), // Sort properties alphabetically
+      expanded: true // Default to expanded
+    })).sort((a, b) => a.name.localeCompare(b.name)); // Sort categories alphabetically
+  }
+
+  private determinePropertyType(key: string, value: any): PropertyDefinition['type'] {
+    if (key.toLowerCase().includes('color')) return 'color';
+    if (key.toLowerCase().includes('padding') || key.toLowerCase().includes('margin')) return 'spacing';
+    if (key.toLowerCase().includes('alignment')) return 'alignment';
+    if (typeof value === 'boolean') return 'boolean';
+    if (typeof value === 'number') return 'number';
+    if (typeof value === 'string' && (key.toLowerCase().includes('axisalignment') || key.toLowerCase().includes('axissize') || key.toLowerCase().includes('fontweight') || key.toLowerCase().includes('fontstyle') || key.toLowerCase().includes('textalign') || key.toLowerCase().includes('icon') || key.toLowerCase().includes('scrolldirection'))) return 'select';
+    return 'text';
+  }
+
+  private determinePropertyCategory(key: string, widgetType: WidgetType): string {
+    // This logic can be expanded based on your backend's `widget_group` or `category`
+    // For now, a simple heuristic:
+    if (key.toLowerCase().includes('width') || key.toLowerCase().includes('height') || key.toLowerCase().includes('axisalignment') || key.toLowerCase().includes('axissize') || key.toLowerCase().includes('flex') || key.toLowerCase().includes('scroll')) return 'Layout';
+    if (key.toLowerCase().includes('padding') || key.toLowerCase().includes('margin')) return 'Spacing';
+    if (key.toLowerCase().includes('color') || key.toLowerCase().includes('decoration') || key.toLowerCase().includes('elevation') || key.toLowerCase().includes('radius') || key.toLowerCase().includes('border')) return 'Appearance';
+    if (key.toLowerCase().includes('text') || key.toLowerCase().includes('title') || key.toLowerCase().includes('icon') || key.toLowerCase().includes('hint')) return 'Content';
+    if (key.toLowerCase().includes('font')) return 'Typography';
+    if (key.toLowerCase().includes('autofocus')) return 'Behavior';
+    return 'General';
+  }
+
+  private humanizePropertyLabel(key: string): string {
+    return key.replace(/([A-Z])/g, ' $1') // Add space before capital letters
+      .replace(/([a-z])([0-9])/g, '$1 $2') // Add space between letter and number
+      .replace(/_/g, ' ') // Replace underscores with spaces
+      .replace(/\b\w/g, char => char.toUpperCase()) // Capitalize first letter of each word
+      .replace('Id', 'ID') // Specific correction
+      .trim();
+  }
+
+  private getOptionsForProperty(key: string): { label: string; value: any }[] | undefined {
+    switch (key) {
+      case 'mainAxisAlignment':
+        return Object.entries(MainAxisAlignment).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
+      case 'crossAxisAlignment':
+        return Object.entries(CrossAxisAlignment).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
+      case 'mainAxisSize':
+        return Object.entries(MainAxisSize).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
+      case 'alignment':
+        return Object.entries(Alignment).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
+      case 'fontWeight':
+        return Object.entries(FontWeight).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
+      case 'fontStyle':
+        return Object.entries(FontStyle).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
+      case 'textAlign':
+        return Object.entries(TextAlign).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
+      case 'scrollDirection':
+        return [{label: 'Vertical', value: 'vertical'}, {label: 'Horizontal', value: 'horizontal'}];
+      case 'icon': // For Icon widget's 'icon' property
+        return [
+          {label: 'Star', value: 'star'},
+          {label: 'Heart', value: 'heart'},
+          {label: 'Home', value: 'home'},
+          {label: 'Settings', value: 'settings'},
+          {label: 'User', value: 'user'},
+          {label: 'Search', value: 'search'},
+          {label: 'Menu', value: 'menu'},
+          {label: 'Close', value: 'close'},
+          {label: 'Check', value: 'check'},
+          {label: 'Arrow Back', value: 'arrow_back'},
+          {label: 'Arrow Forward', value: 'arrow_forward'},
+          {label: 'Phone', value: 'phone'},
+          {label: 'Laptop', value: 'laptop'},
+          {label: 'Camera', value: 'camera_alt'},
+          {label: 'Headphones', value: 'headphones'},
+          {label: 'Watch', value: 'watch'},
+          {label: 'Local Shipping', value: 'local_shipping'},
+          {label: 'Local Offer', value: 'local_offer'},
+          {label: 'Checkroom', value: 'checkroom'},
+          {label: 'Lock', value: 'lock'},
+          {label: 'Email', value: 'email'},
+          {label: 'Access Time', value: 'access_time'},
+          {label: 'Sort', value: 'sort'},
+          {label: 'Tune', value: 'tune'},
+          {label: 'Notifications', value: 'notifications'},
+          {label: 'Visibility', value: 'visibility'},
+          {label: 'Help', value: 'help'},
+          {label: 'Error Outline', value: 'error_outline'},
+          {label: 'Logout', value: 'logout'},
+          {label: 'Payment', value: 'payment'},
+          {label: 'Location On', value: 'location_on'},
+          {label: 'Check Box', value: 'check_box'},
+          {label: 'Check Box Outline Blank', value: 'check_box_outline_blank'},
+          {label: 'Radio Button Checked', value: 'radio_button_checked'},
+          {label: 'Radio Button Unchecked', value: 'radio_button_unchecked'},
+          {label: 'Shopping Cart', value: 'shopping_cart'},
+          {label: 'Person', value: 'person'},
+          {label: 'Sports Basketball', value: 'sports_basketball'},
+          {label: 'Music Note', value: 'music_note'},
+          {label: 'Pets', value: 'pets'},
+          {label: 'Shopping Basket', value: 'shopping_basket'},
+          {label: 'Directions Car', value: 'directions_car'},
+          {label: 'Sports Soccer', value: 'sports_soccer'},
+          {label: 'Mic', value: 'mic'},
+          {label: 'Speaker', value: 'speaker'},
+          {label: 'Phone Android', value: 'phone_android'},
+          {label: 'Gamepad', value: 'gamepad'},
+          {label: 'History', value: 'history'},
+          {label: 'Add', value: 'add'},
+          {label: 'Remove', value: 'remove'},
+          {label: 'Favorite Border', value: 'favorite_border'},
+          {label: 'Favorite', value: 'favorite'},
+          {label: 'Share', value: 'share'},
+          {label: 'Image', value: 'image'},
+          {label: 'Headset', value: 'headset'},
+          {label: 'Camera Alt', value: 'camera_alt'},
+          {label: 'Filter List', value: 'filter_list'},
+          {label: 'Delete', value: 'delete'},
+          {label: 'Edit', value: 'edit'},
+          {label: 'Check Circle', value: 'check_circle'},
+          {label: 'Remove Circle Outline', value: 'remove_circle_outline'},
+          {label: 'Add Circle Outline', value: 'add_circle_outline'},
+          {label: 'Visibility Off', value: 'visibility_off'},
+          {label: 'Help Outline', value: 'help_outline'},
+          {label: 'Menu Book', value: 'menu_book'},
+          {label: 'Toys', value: 'toys'}
+        ];
+      default:
+        return undefined;
+    }
+  }
+
+  private getMinForProperty(key: string): number | undefined {
+    const minValues: { [key: string]: number } = {
+      'width': 0,
+      'height': 0,
+      'fontSize': 8,
+      'elevation': 0,
+      'borderRadius': 0,
+      'borderWidth': 0,
+      'flex': 1,
+      'size': 8,
+      'separatorHeight': 0
+    };
+    return minValues[key];
+  }
+
+  private getMaxForProperty(key: string): number | undefined {
+    const maxValues: { [key: string]: number } = {
+      'width': 1000,
+      'height': 1000,
+      'fontSize': 72,
+      'elevation': 24,
+      'borderRadius': 100,
+      'borderWidth': 20,
+      'flex': 10,
+      'size': 128,
+      'separatorHeight': 50
+    };
+    return maxValues[key];
+  }
+
+  private getStepForProperty(key: string): number | undefined {
+    const stepValues: { [key: string]: number } = {
+      'width': 10,
+      'height': 10,
+      'fontSize': 1,
+      'elevation': 1,
+      'borderRadius': 1,
+      'borderWidth': 1,
+      'flex': 1,
+      'size': 1,
+      'separatorHeight': 1
+    };
+    return stepValues[key] || 1;
+  }
+
+  private getUnitForProperty(key: string): string | undefined {
+    const unitValues: { [key: string]: string } = {
+      'width': 'px',
+      'height': 'px',
+      'fontSize': 'px',
+      'borderRadius': 'px',
+      'borderWidth': 'px',
+      'size': 'px',
+      'separatorHeight': 'px'
+    };
+    return unitValues[key];
+  }
+
+  private getValidationForProperty(key: string): ValidationRule[] | undefined {
+    const validationRules: { [key: string]: ValidationRule[] } = {
+      'text': [{type: 'required', message: 'Text cannot be empty'}],
+      'title': [{type: 'required', message: 'Title cannot be empty'}],
+      'name': [{type: 'required', message: 'Name cannot be empty'}],
+      'width': [{type: 'min', value: 0, message: 'Width must be positive'}],
+      'height': [{type: 'min', value: 0, message: 'Height must be positive'}],
+      'fontSize': [
+        {type: 'min', value: 8, message: 'Font size must be at least 8'},
+        {type: 'max', value: 72, message: 'Font size must be less than 72'}
+      ]
+    };
+    return validationRules[key];
+  }
+
+  private getDependsOnForProperty(key: string): string[] | undefined {
+    const dependencies: { [key: string]: string[] } = {
+      'decoration.border.color': ['decoration.border.width']
+    };
+    return dependencies[key];
   }
 
   private getCategoryIcon(category: string): string {
@@ -676,7 +335,9 @@ export class PropertyEditorService {
       'Spacing': '↔️',
       'Appearance': '🎨',
       'Content': '📝',
-      'Typography': '🔤'
+      'Typography': '🔤',
+      'Behavior': '⚙️',
+      'General': '📋'
     };
     return icons[category] || '📋';
   }
@@ -699,7 +360,7 @@ export class PropertyEditorService {
       const currentRoot = this.canvasState.currentState.rootWidget;
       if (currentRoot) {
         const updatedRoot = this.updateWidgetInTree(currentRoot, widgetId, updatedWidget);
-        this.canvasState.updateState({ rootWidget: updatedRoot });
+        this.canvasState.updateState({rootWidget: updatedRoot});
       }
     } catch (error) {
       console.error('Failed to update property:', error);
@@ -743,7 +404,7 @@ export class PropertyEditorService {
 
   private updateWidgetInTree(root: FlutterWidget, widgetId: string, updatedWidget: FlutterWidget): FlutterWidget {
     if (root.id === widgetId) {
-      return { ...updatedWidget, children: root.children };
+      return {...updatedWidget, children: root.children};
     }
 
     return {
@@ -784,11 +445,12 @@ export class PropertyEditorService {
     const widget = this.canvasState.findWidget(widgetId);
     if (!widget) return;
 
-    const schema = this.propertySchemas.get(widget.type);
-    const property = schema?.find(p => p.key === propertyPath);
+    const definition = this.widgetRegistry.getWidgetDefinition(widget.type);
+    if (!definition) return;
 
-    if (property) {
-      this.updateProperty(widgetId, propertyPath, property.defaultValue);
+    const defaultValue = this.getNestedProperty(definition.defaultProperties, propertyPath);
+    if (defaultValue !== undefined) {
+      this.updateProperty(widgetId, propertyPath, defaultValue);
     }
   }
 
@@ -796,11 +458,17 @@ export class PropertyEditorService {
     const widget = this.canvasState.findWidget(widgetId);
     if (!widget) return;
 
-    const schema = this.propertySchemas.get(widget.type);
-    if (schema) {
-      schema.forEach(property => {
-        this.updateProperty(widgetId, property.key, property.defaultValue);
-      });
+    const definition = this.widgetRegistry.getWidgetDefinition(widget.type);
+    if (!definition) return;
+
+    // Update all properties to default values
+    const updatedWidget = JSON.parse(JSON.stringify(widget));
+    updatedWidget.properties = JSON.parse(JSON.stringify(definition.defaultProperties));
+
+    const currentRoot = this.canvasState.currentState.rootWidget;
+    if (currentRoot) {
+      const updatedRoot = this.updateWidgetInTree(currentRoot, widgetId, updatedWidget);
+      this.canvasState.updateState({rootWidget: updatedRoot});
     }
   }
 }

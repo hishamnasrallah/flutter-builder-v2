@@ -211,7 +211,7 @@ export interface WidgetDefinition {
   icon: string;
   category: WidgetCategory;
   isContainer: boolean;
-  defaultProperties: Partial<WidgetProperties>;
+  defaultProperties: Record<string, any>; // Changed to allow dynamic properties
   acceptsChildren: boolean;
   maxChildren?: number;
 }

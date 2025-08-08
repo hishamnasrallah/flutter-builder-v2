@@ -1,27 +1,30 @@
+// src/app/core/services/component-template.service.ts
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
+import { map } from 'rxjs/operators';
 
-export interface ComponentTemplate {
-  id: number;
+// Define the structure of the backend's ComponentTemplate
+export interface BackendComponentTemplate {
+  flutter_widget: string;
   name: string;
   category: string;
-  widget_type: string;
-  widget_group: string;
-  properties: any;
-  is_container: boolean;
-  max_children?: number;
+  icon: string;
   description?: string;
-  flutter_widget?: string;
-  icon?: string;
-  display_order?: number;
-  show_in_builder?: boolean;
+  default_properties: any;
+  can_have_children: boolean;
+  max_children?: number;
+  is_active: boolean;
+  widget_group?: string; // Add this field
+  display_order?: number; // Add this field
+  show_in_builder?: boolean; // Add this field
 }
 
+// Define the structure of the organized response
 export interface OrganizedComponentsResponse {
   groups: string[];
   total_components: number;
-  components: Record<string, ComponentTemplate[]>;
+  components: { [groupName: string]: BackendComponentTemplate[] };
 }
 
 @Injectable({
@@ -30,20 +33,22 @@ export interface OrganizedComponentsResponse {
 export class ComponentTemplateService {
   constructor(private api: ApiService) {}
 
-  getComponents(): Observable<ComponentTemplate[]> {
-    return this.api.get<ComponentTemplate[]>('api/projects/component-templates/');
+  // This method should now fetch the organized data
+  getOrganizedComponents(): Observable<OrganizedComponentsResponse> {
+    return this.api.get<OrganizedComponentsResponse>('api/projects/component-templates/organized/');
+  }
+
+  // Keep other methods if they are still used elsewhere
+  getComponents(): Observable<BackendComponentTemplate[]> {
+    return this.api.get<BackendComponentTemplate[]>('api/projects/component-templates/');
   }
 
   getComponentsByCategory(): Observable<any> {
     return this.api.get('api/projects/component-templates/by_category/');
   }
 
-  getComponentsForBuilder(): Observable<ComponentTemplate[]> {
-    return this.api.get<ComponentTemplate[]>('api/projects/component-templates/components/');
-  }
-
-  getOrganizedComponents(): Observable<OrganizedComponentsResponse> {
-    return this.api.get<OrganizedComponentsResponse>('api/projects/component-templates/organized/');
+  getComponentsForBuilder(): Observable<BackendComponentTemplate[]> {
+    return this.api.get<BackendComponentTemplate[]>('api/projects/component-templates/components/');
   }
 
   getWidgetGroups(): Observable<{ widget_groups: string[]; count: number }> {

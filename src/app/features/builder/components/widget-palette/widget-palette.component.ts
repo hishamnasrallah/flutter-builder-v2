@@ -1,5 +1,4 @@
 // src/app/features/builder/components/widget-palette/widget-palette.component.ts
-
 import {Component, OnInit} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
@@ -11,25 +10,17 @@ import {
 } from '../../../../core/models/flutter-widget.model';
 import {WidgetRegistryService} from '../../../../core/services/widget-registry.service';
 import {CanvasStateService, DragData} from '../../../../core/services/canvas-state.service';
-import {ComponentTemplateService} from '../../../../core/services/component-template.service';
+import {
+  ComponentTemplateService,
+  BackendComponentTemplate,
+  OrganizedComponentsResponse
+} from '../../../../core/services/component-template.service'; // Import BackendComponentTemplate
 import {NotificationService} from '../../../../core/services/notification.service';
-
-interface ComponentTemplate {
-  id: number;
-  name: string;
-  category: string;
-  widget_type: string;
-  widget_group: string;
-  properties: any;
-  is_container: boolean;
-  max_children?: number;
-  description?: string;
-}
 
 interface CategoryGroup {
   category: string;
   displayName: string;
-  widgets: WidgetDefinition[];
+  widgets: WidgetDefinition[]; // Now holds WidgetDefinition
   isExpanded: boolean;
 }
 
@@ -244,12 +235,26 @@ export class WidgetPaletteComponent implements OnInit {
 
   private loadDynamicWidgets(): void {
     this.componentTemplateService.getOrganizedComponents().subscribe({
-      next: (response: any) => {
+      next: (response: OrganizedComponentsResponse) => {
         if (response && response.components) {
-          this.processDynamicWidgets(response.components);
+          // First, register all component templates with the WidgetRegistryService
+          for (const groupName in response.components) {
+            if (response.components.hasOwnProperty(groupName)) {
+              response.components[groupName].forEach(template => {
+                // Only register if show_in_builder is true or undefined (default to true)
+                if (template.show_in_builder !== false) {
+                  this.widgetRegistry.registerWidgetDefinition(template);
+                }
+              });
+            }
+          }
+
+          // Then, build the category groups for the palette UI
+          this.buildCategoryGroups(response.components);
         } else {
-          // Fallback to components endpoint if organized doesn't work
-          this.loadFallbackWidgets();
+          this.notification.showWarning('No organized components found from backend.');
+          // Fallback to static definitions if no data or unexpected format
+          this.initializeStaticCategories();
         }
       },
       error: (error) => {
@@ -260,185 +265,139 @@ export class WidgetPaletteComponent implements OnInit {
     });
   }
 
-  private loadFallbackWidgets(): void {
-    this.componentTemplateService.getComponentsForBuilder().subscribe({
-      next: (templates: ComponentTemplate[]) => {
-        const groupedTemplates = this.groupTemplatesByCategory(templates);
-        this.buildCategoryGroups(groupedTemplates);
-      },
-      error: (error) => {
-        console.error('Error loading fallback widgets:', error);
-        this.initializeStaticCategories();
-      }
-    });
-  }
+  private buildCategoryGroups(componentsByGroup: { [groupName: string]: BackendComponentTemplate[] }): void {
+    this.categoryGroups = Object.entries(componentsByGroup)
+      .map(([groupName, templates]) => {
+        const widgets: WidgetDefinition[] = templates
+          .filter(template => template.show_in_builder !== false) // Filter out hidden widgets
+          .map(template => this.widgetRegistry.getWidgetDefinition(
+            this.widgetRegistry.normalizeBackendWidgetType(template.flutter_widget)
+          ))
+          .filter((def): def is WidgetDefinition => def !== undefined); // Filter out any undefined definitions
 
-  private processDynamicWidgets(componentsByGroup: Record<string, ComponentTemplate[]>): void {
-  console.log('WidgetPaletteComponent: processDynamicWidgets called with:', componentsByGroup);
+        return {
+          category: groupName,
+          displayName: groupName,
+          widgets: widgets,
+          isExpanded: groupName.toLowerCase().includes('basic') || groupName.toLowerCase().includes('layout') // Default expansion logic
+        };
+      })
+      .filter(group => group.widgets.length > 0); // Only show groups with widgets
 
-  this.categoryGroups = Object.entries(componentsByGroup).map(([groupName, templates]) => {
-    console.log(`WidgetPaletteComponent: Processing group "${groupName}" with ${templates.length} templates`);
-
-    const widgets = templates.map(template => {
-      const widgetDef = this.mapTemplateToWidgetDefinition(template);
-      if (!widgetDef.type) {
-        console.error('WidgetPaletteComponent: ERROR! Created widget definition without type:', widgetDef);
-      }
-      return widgetDef;
-    });
-
-    return {
-      category: groupName,
-      displayName: groupName,
-      widgets: widgets,
-      isExpanded: groupName === 'Basic Layout' || groupName === 'Basic Display'
-    };
-  });
-
-  this.categoryGroups = this.categoryGroups.filter(group => group.widgets.length > 0);
-  this.filteredGroups = [...this.categoryGroups];
-
-  console.log('WidgetPaletteComponent: Final category groups:', this.categoryGroups);
-}
-
-  private groupTemplatesByCategory(templates: ComponentTemplate[]): Map<string, ComponentTemplate[]> {
-    const grouped = new Map<string, ComponentTemplate[]>();
-
-    templates.forEach(template => {
-      const category = template.widget_group || template.category || 'Other';
-      if (!grouped.has(category)) {
-        grouped.set(category, []);
-      }
-      grouped.get(category)!.push(template);
+    // Sort groups by display order if available, otherwise alphabetically
+    this.categoryGroups.sort((a, b) => {
+      // You might need to add a 'group_order' to your backend response if you want specific ordering
+      // For now, sort alphabetically by display name
+      return a.displayName.localeCompare(b.displayName);
     });
 
-    return grouped;
-  }
-
-  private buildCategoryGroups(groupedTemplates: Map<string, ComponentTemplate[]>): void {
-    this.categoryGroups = Array.from(groupedTemplates.entries()).map(([categoryName, templates]) => ({
-      category: categoryName,
-      displayName: categoryName,
-      widgets: templates.map(template => this.mapTemplateToWidgetDefinition(template)),
-      isExpanded: categoryName.toLowerCase().includes('basic') || categoryName.toLowerCase().includes('layout')
-    }));
-
-    this.categoryGroups = this.categoryGroups.filter(group => group.widgets.length > 0);
     this.filteredGroups = [...this.categoryGroups];
   }
 
-  private mapTemplateToWidgetDefinition(template: ComponentTemplate): WidgetDefinition {
-  // Ensure widget_type is a string. If template.widget_type is undefined or null, default to 'Custom'.
-  const widgetType = (template.widget_type || template.name || 'Custom') as WidgetType;
-
-  const definition: WidgetDefinition = {
-    type: widgetType, // This is the critical assignment
-    displayName: template.name || widgetType,
-    icon: this.getIconForWidgetType(template.widget_type || widgetType),
-    category: this.mapCategoryString(template.category),
-    isContainer: template.is_container || false,
-    acceptsChildren: template.is_container || false,
-    maxChildren: template.max_children,
-    defaultProperties: template.properties || {}
-  };
-
-  console.log('WidgetPaletteComponent: Mapped template to WidgetDefinition:', definition);
-  console.log('  - definition.type:', definition.type);
-  console.log('  - typeof definition.type:', typeof definition.type);
-
-  if (!definition.type) {
-    console.error('ERROR: WidgetDefinition created without type!', definition);
-  }
-
-  return definition;
-}
-
-  private mapCategoryString(category: string): WidgetCategory {
-    const categoryMap: Record<string, WidgetCategory> = {
-      'layout': WidgetCategory.LAYOUT,
-      'display': WidgetCategory.BASIC,
-      'input': WidgetCategory.FORM,
-      'navigation': WidgetCategory.NAVIGATION,
-      'material': WidgetCategory.MATERIAL
-    };
-
-    return categoryMap[category.toLowerCase()] || WidgetCategory.BASIC;
-  }
-
-  private getIconForWidgetType(widgetType: string | undefined | null): string {
-  if (!widgetType) {
-    return '?';
-  }
-
-  const iconMap: Record<string, string> = {
-      'Container': '□',
-      'Text': 'T',
-      'Column': '⬇',
-      'Row': '➡',
-      'Stack': '⬚',
-      'Padding': '▫',
-      'Center': '⊕',
-      'SizedBox': '▭',
-      'Scaffold': '📱',
-      'AppBar': '━',
-      'ElevatedButton': '🔘',
-      'Button': '🔘',
-      'TextField': '📝',
-      'Card': '🎴',
-      'ListView': '📋',
-      'GridView': '⚏',
-      'Image': '🖼️',
-      'Icon': '✦',
-      'Divider': '─',
-      'Expanded': '↔',
-      'Flexible': '⇔',
-      'Wrap': '⤸',
-      'AspectRatio': '▢',
-      'FittedBox': '⊡',
-      'ListTile': '☰',
-      'Checkbox': '☑',
-      'Radio': '⊙',
-      'Switch': '⊛',
-      'Slider': '━●━',
-      'DropdownButton': '▼',
-      'CircularProgressIndicator': '⟳',
-      'LinearProgressIndicator': '▬▬▬',
-      'Drawer': '☰',
-      'BottomNavigationBar': '⊥',
-      'TabBar': '⊤',
-      'FloatingActionButton': '⊕',
-      'PopupMenuButton': '⋮',
-      'Tooltip': '💬',
-      'Hero': '★',
-      'AnimatedContainer': '▢⇄',
-      'FadeTransition': '▒',
-      'Form': '📋',
-      'TextFormField': '📝'
-    };
-
-    return iconMap[widgetType] || '?';
-  }
-
-  // Fallback to static categories if API fails
+  // This method is now a fallback, keep it for development/testing
   private initializeStaticCategories(): void {
-    const categoryDisplayNames: Record<WidgetCategory, string> = {
-      [WidgetCategory.LAYOUT]: 'Layout',
-      [WidgetCategory.BASIC]: 'Basic',
-      [WidgetCategory.MATERIAL]: 'Material',
-      [WidgetCategory.FORM]: 'Forms',
-      [WidgetCategory.NAVIGATION]: 'Navigation'
-    };
+    // This method should only be called if backend data fails to load
+    // Create minimal static widget definitions for fallback
 
-    const categories = Object.values(WidgetCategory);
+    // First, register some basic widget definitions if they don't exist
+    if (!this.widgetRegistry.getWidgetDefinition(WidgetType.CONTAINER)) {
+      this.widgetRegistry.registerWidgetDefinition({
+        flutter_widget: 'container',
+        name: 'Container',
+        category: 'layout',
+        icon: 'crop_square',
+        default_properties: {width: 200, height: 200, color: '#FFFFFF'},
+        can_have_children: true,
+        max_children: 1,
+        is_active: true,
+        show_in_builder: true
+      });
+    }
 
-    this.categoryGroups = categories.map(category => ({
-      category: category as string,
-      displayName: categoryDisplayNames[category],
-      widgets: this.widgetRegistry.getWidgetsByCategory(category),
-      isExpanded: category === WidgetCategory.LAYOUT || category === WidgetCategory.BASIC
+    if (!this.widgetRegistry.getWidgetDefinition(WidgetType.TEXT)) {
+      this.widgetRegistry.registerWidgetDefinition({
+        flutter_widget: 'text',
+        name: 'Text',
+        category: 'display',
+        icon: 'text_fields',
+        default_properties: {text: 'Hello World', fontSize: 16, textColor: '#000000'},
+        can_have_children: false,
+        is_active: true,
+        show_in_builder: true
+      });
+    }
+
+    if (!this.widgetRegistry.getWidgetDefinition(WidgetType.COLUMN)) {
+      this.widgetRegistry.registerWidgetDefinition({
+        flutter_widget: 'column',
+        name: 'Column',
+        category: 'layout',
+        icon: 'view_column',
+        default_properties: {mainAxisAlignment: 'start', crossAxisAlignment: 'center'},
+        can_have_children: true,
+        is_active: true,
+        show_in_builder: true
+      });
+    }
+
+    if (!this.widgetRegistry.getWidgetDefinition(WidgetType.ROW)) {
+      this.widgetRegistry.registerWidgetDefinition({
+        flutter_widget: 'row',
+        name: 'Row',
+        category: 'layout',
+        icon: 'view_stream',
+        default_properties: {mainAxisAlignment: 'start', crossAxisAlignment: 'center'},
+        can_have_children: true,
+        is_active: true,
+        show_in_builder: true
+      });
+    }
+
+    if (!this.widgetRegistry.getWidgetDefinition(WidgetType.ELEVATED_BUTTON)) {
+      this.widgetRegistry.registerWidgetDefinition({
+        flutter_widget: 'elevated_button',
+        name: 'Elevated Button',
+        category: 'input',
+        icon: 'smart_button',
+        default_properties: {text: 'Button'},
+        can_have_children: false,
+        is_active: true,
+        show_in_builder: true
+      });
+    }
+
+    if (!this.widgetRegistry.getWidgetDefinition(WidgetType.TEXT_FIELD)) {
+      this.widgetRegistry.registerWidgetDefinition({
+        flutter_widget: 'text_field',
+        name: 'Text Field',
+        category: 'input',
+        icon: 'input',
+        default_properties: {hintText: 'Enter text...'},
+        can_have_children: false,
+        is_active: true,
+        show_in_builder: true
+      });
+    }
+
+    // Now get all widget definitions and group them by category
+    const allDefinitions = this.widgetRegistry.getAllWidgetDefinitions();
+    const categoryMap = new Map<string, WidgetDefinition[]>();
+
+    allDefinitions.forEach(def => {
+      const categoryName = def.category.toString(); // Convert enum to string
+      if (!categoryMap.has(categoryName)) {
+        categoryMap.set(categoryName, []);
+      }
+      categoryMap.get(categoryName)!.push(def);
+    });
+
+    this.categoryGroups = Array.from(categoryMap.entries()).map(([cat, widgets]) => ({
+      category: cat,
+      displayName: cat,
+      widgets: widgets,
+      isExpanded: true
     }));
 
-    this.categoryGroups = this.categoryGroups.filter(group => group.widgets.length > 0);
     this.filteredGroups = [...this.categoryGroups];
   }
 
@@ -471,56 +430,27 @@ export class WidgetPaletteComponent implements OnInit {
       .filter(group => group.widgets.length > 0);
   }
 
-  createDragData(widget: WidgetDefinition): DragData {
-  if (!widget.type) {
-    console.error('Widget definition missing type:', widget);
-    throw new Error('Cannot create drag data for widget without type');
-  }
-
-  return {
-    type: 'new-widget',
-    widgetType: widget.type,
-    sourceData: widget
-  };
-}
-
   onNativeDragStart(event: DragEvent, widget: WidgetDefinition): void {
-  console.log('WidgetPaletteComponent: onNativeDragStart - Received widget:', widget);
-  console.log('WidgetPaletteComponent: onNativeDragStart - widget.type (from received object):', widget.type);
+    console.log('WidgetPaletteComponent: onNativeDragStart - Received widget:', widget);
+    console.log('WidgetPaletteComponent: onNativeDragStart - widget.type (from received object):', widget.type);
 
-  // Defensive programming: ensure widget.type exists
-  if (!widget.type) {
-    console.error('WidgetPaletteComponent: ERROR! Widget has no type property!');
-    console.error('  Full widget object:', JSON.stringify(widget, null, 2));
-    // Attempt to recover
-    widget.type = (widget.displayName || 'Custom').replace(/\s+/g, '') as WidgetType;
-    console.warn('WidgetPaletteComponent: Attempting recovery with type:', widget.type);
+    const dragData: DragData = {
+      type: 'new-widget',
+      widgetType: widget.type, // This is crucial
+      sourceData: widget
+    };
+    console.log('WidgetPaletteComponent: onNativeDragStart - Created dragData:', dragData);
+    event.dataTransfer!.effectAllowed = 'copy';
+    event.dataTransfer!.setData('application/json', JSON.stringify(dragData));
+
+    const element = event.target as HTMLElement;
+    element.classList.add('dragging');
+    this.canvasState.setDragging(true);
   }
-
-  const dragData: DragData = {
-    type: 'new-widget',
-    widgetType: widget.type, // This should now be correctly populated
-    sourceData: widget
-  };
-
-  console.log('WidgetPaletteComponent: onNativeDragStart - Created dragData:', dragData);
-  console.log('  - dragData.widgetType:', dragData.widgetType);
-
-  event.dataTransfer!.effectAllowed = 'copy';
-  event.dataTransfer!.setData('application/json', JSON.stringify(dragData));
-
-  // Add visual feedback
-  const element = event.target as HTMLElement;
-  element.classList.add('dragging');
-
-  this.canvasState.setDragging(true);
-}
 
   onNativeDragEnd(event: DragEvent): void {
-    // Remove visual feedback
     const element = event.target as HTMLElement;
     element.classList.remove('dragging');
-
     this.canvasState.setDragging(false);
   }
 }
