@@ -99,13 +99,13 @@ export class CanvasStateService {
   this.screenService.getScreen(screenId).subscribe({
   next: (screen) => {
     console.log('CanvasStateService - Raw screen from backend:', screen);
-    console.log('  - screen.ui_structure:', screen.ui_structure);
 
     let loadedUiStructure = screen.ui_structure;
 
     // Normalize the UI structure to ensure all 'children' properties are arrays
+    // AND normalize widget types to PascalCase
     if (loadedUiStructure) {
-      loadedUiStructure = this.normalizeWidgetChildren(loadedUiStructure);
+      loadedUiStructure = this.normalizeUiStructure(loadedUiStructure);
       console.log('CanvasStateService - After normalization:', loadedUiStructure);
     } else {
       console.log('CanvasStateService - ui_structure is null/undefined, creating empty root');
@@ -137,22 +137,69 @@ export class CanvasStateService {
 }
 
 /**
- * Recursively normalizes the 'children' property of a FlutterWidget
- * to ensure it's always an array. If 'children' is null or undefined,
- * it's converted to an empty array.
+ * Normalize widget type from backend format to frontend enum format
+ * Converts lowercase types to PascalCase (e.g., "column" -> "Column")
  */
-private normalizeWidgetChildren(widget: FlutterWidget): FlutterWidget {
-  // If widget.children is not an array, set it to an empty array
+private normalizeWidgetType(type: string): WidgetType {
+  if (!type) {
+    return WidgetType.CUSTOM; // Fallback for empty or null types
+  }
+
+  // Convert first letter to uppercase, rest to lowercase
+  // This handles cases like "column" -> "Column" and "Scaffold" -> "Scaffold"
+  const normalizedType = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+
+  // Special cases mapping if backend uses different names than enum
+  const typeMapping: Record<string, WidgetType> = {
+    'appbar': WidgetType.APP_BAR,
+    'sizedbox': WidgetType.SIZED_BOX,
+    'listview': WidgetType.LIST_VIEW,
+    'gridview': WidgetType.GRID_VIEW,
+    'textfield': WidgetType.TEXT_FIELD,
+    'textformfield': WidgetType.TEXT_FORM_FIELD,
+    'elevatedbutton': WidgetType.ELEVATED_BUTTON,
+    'textbutton': WidgetType.TEXT_BUTTON,
+    'outlinedbutton': WidgetType.OUTLINED_BUTTON,
+    'iconbutton': WidgetType.ICON_BUTTON,
+    'listtile': WidgetType.LIST_TILE,
+    'dropdownbutton': WidgetType.DROPDOWN_BUTTON,
+    'circularprogressindicator': WidgetType.CIRCULAR_PROGRESS,
+    'linearprogressindicator': WidgetType.LINEAR_PROGRESS,
+    'bottomnavigationbar': WidgetType.BOTTOM_NAV_BAR,
+    'tabbar': WidgetType.TAB_BAR,
+    'floatingactionbutton': WidgetType.FAB,
+    'popupmenubutton': WidgetType.POPUP_MENU,
+    'aspectratio': WidgetType.ASPECT_RATIO,
+    'fittedbox': WidgetType.FITTED_BOX
+  };
+
+  // Check if we have a special mapping for this type
+  const lowerType = type.toLowerCase();
+  if (typeMapping[lowerType]) {
+    return typeMapping[lowerType];
+  }
+
+  // Otherwise, use the simple capitalized version
+  return normalizedType as WidgetType;
+}
+
+/**
+ * Recursively normalizes the UI structure:
+ * - Ensures 'children' property is an array
+ * - Converts widget 'type' to PascalCase
+ */
+private normalizeUiStructure(widget: any): FlutterWidget {
+  // Normalize the widget type
+  widget.type = this.normalizeWidgetType(widget.type);
+
+  // Ensure children is an array and recursively normalize children
   if (!Array.isArray(widget.children)) {
     widget.children = [];
   }
 
-  // Recursively process children to ensure all nested widgets are also normalized
-  for (const child of widget.children) {
-    this.normalizeWidgetChildren(child);
-  }
+  widget.children = widget.children.map((child: any) => this.normalizeUiStructure(child));
 
-  return widget;
+  return widget as FlutterWidget;
 }
 
   // Save current state to backend
