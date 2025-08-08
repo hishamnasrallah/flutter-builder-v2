@@ -42,7 +42,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track child.id; let i = $index) {
+              @for (child of widget.children; track child; let i = $index) {
                 <div class="child-wrapper">
                   @if (showDropIndicator(i)) {
                     <div class="drop-indicator"></div>
@@ -82,7 +82,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track child.id; let i = $index) {
+              @for (child of widget.children; track child; let i = $index) {
                 <div class="child-wrapper">
                   @if (showDropIndicator(i)) {
                     <div class="drop-indicator-horizontal"></div>
@@ -117,7 +117,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track child.id; let i = $index) {
+              @for (child of widget.children; track $index; let i = $index) {
                 <div class="child-wrapper-horizontal">
                   @if (showDropIndicator(i)) {
                     <div class="drop-indicator-vertical"></div>
@@ -151,8 +151,8 @@ import {SelectionService} from '../../../../core/services/selection.service';
             [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track child.id) {
-                <div class="absolute" [ngStyle]="getStackChildPosition($index, child)">
+              @for (child of widget.children; track $index; let i = $index) {
+                <div class="absolute" [ngStyle]="getStackChildPosition(i, child)">
                   <app-widget-renderer
                     [widget]="child"
                     [selectedId]="selectedId"
@@ -180,7 +180,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track child.id) {
+              @for (child of widget.children; track trackByChild; let i = $index) {
                 <app-widget-renderer
                   [widget]="child"
                   [selectedId]="selectedId"
@@ -206,7 +206,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track child.id) {
+              @for (child of widget.children; track trackByChild; let i = $index) {
                 <app-widget-renderer
                   [widget]="child"
                   [selectedId]="selectedId"
@@ -233,7 +233,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track child.id) {
+              @for (child of widget.children; track trackByChild; let i = $index) {
                 <app-widget-renderer
                   [widget]="child"
                   [selectedId]="selectedId"
@@ -259,7 +259,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track child.id) {
+              @for (child of widget.children; track trackByChild; let i = $index) {
                 <app-widget-renderer
                   [widget]="child"
                   [selectedId]="selectedId"
@@ -292,7 +292,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             (dragleave)="onDragLeave($event)"
             [class.drop-zone-active]="isDragOver">
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track child.id) {
+              @for (child of widget.children; track trackByChild; let i = $index) {
                 <app-widget-renderer
                   [widget]="child"
                   [selectedId]="selectedId"
@@ -349,7 +349,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             (dragleave)="onDragLeave($event)"
             [class.drop-zone-active]="isDragOver">
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track child.id; let i = $index) {
+              @for (child of widget.children; track $index; let i = $index) {
                 <div class="list-item-wrapper">
                   @if (showDropIndicator(i)) {
                     <div class="drop-indicator-horizontal"></div>
@@ -383,7 +383,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             (dragleave)="onDragLeave($event)"
             [class.drop-zone-active]="isDragOver">
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track child.id) {
+              @for (child of widget.children; track trackByChild; let i = $index) {
                 <app-widget-renderer
                   [widget]="child"
                   [selectedId]="selectedId"
@@ -719,7 +719,7 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
           dropIndex
         );
       } else {
-          console.warn('WidgetRenderer Drop Handler: Unhandled drag data type or missing required fields. dragData:', dragData);
+        console.warn('WidgetRenderer Drop Handler: Unhandled drag data type or missing required fields. dragData:', dragData);
       }
     } catch (error) {
       console.error('Error handling drop:', error);
@@ -833,12 +833,21 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
 
   getWidgetStyles(): any {
     const styles: any = {};
+
+    if (!this.widget || !this.widget.properties) {
+      return styles;
+    }
+
     const props = this.widget.properties;
 
-    if (props.width) {
+    if (props && props.width !== undefined && props.width !== null) {
       styles.width = `${props.width}px`;
     }
-    if (props.height) {
+
+    if (props.width !== undefined && props.width !== null) {
+      styles.width = `${props.width}px`;
+    }
+    if (props.height !== undefined && props.height !== null) {
       styles.height = `${props.height}px`;
     }
 
@@ -846,8 +855,8 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
       if (props.color) {
         styles.backgroundColor = props.color;
       }
-      if (props.padding) {
-        styles.padding = `${props.padding.top}px ${props.padding.right}px ${props.padding.bottom}px ${props.padding.left}px`;
+      if (props.padding && typeof props.padding === 'object') {
+        styles.padding = `${props.padding.top || 0}px ${props.padding.right || 0}px ${props.padding.bottom || 0}px ${props.padding.left || 0}px`;
       }
       if (props.margin) {
         styles.margin = `${props.margin.top}px ${props.margin.right}px ${props.margin.bottom}px ${props.margin.left}px`;
@@ -1086,4 +1095,13 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
 
     return styles;
   }
+
+  trackByChild(index: number, child: FlutterWidget): string {
+    return child?.id || `index-${index}`;
+  }
+
+  trackByIndex(index: number): number {
+    return index;
+  }
+
 }

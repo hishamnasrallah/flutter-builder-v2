@@ -1,13 +1,13 @@
 // src/app/core/services/canvas-state.service.ts
 
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
-import { tap, catchError } from 'rxjs/operators';
-import { FlutterWidget, WidgetType } from '../models/flutter-widget.model';
-import { WidgetRegistryService } from './widget-registry.service';
-import { WidgetTreeService } from './widget-tree.service';
-import { v4 as uuidv4 } from 'uuid';
-import { ScreenService } from './screen.service';
+import {Injectable} from '@angular/core';
+import {BehaviorSubject, Observable, of, throwError} from 'rxjs';
+import {tap, catchError} from 'rxjs/operators';
+import {FlutterWidget, WidgetType} from '../models/flutter-widget.model';
+import {WidgetRegistryService} from './widget-registry.service';
+import {WidgetTreeService} from './widget-tree.service';
+import {v4 as uuidv4} from 'uuid';
+import {ScreenService} from './screen.service';
 
 export interface CanvasState {
   rootWidget: FlutterWidget | null;
@@ -87,120 +87,130 @@ export class CanvasStateService {
 
   // Screen management methods
   loadScreen(screenId: number) {
-  this.currentScreenId = screenId;
+    this.currentScreenId = screenId;
 
-  // Clear current state
-  this.updateState({
-    rootWidget: null,
-    selectedWidgetId: null,
-    hoveredWidgetId: null
-  });
-
-  this.screenService.getScreen(screenId).subscribe({
-  next: (screen) => {
-    console.log('CanvasStateService - Raw screen from backend:', screen);
-
-    let loadedUiStructure = screen.ui_structure;
-
-    // Normalize the UI structure to ensure all 'children' properties are arrays
-    // AND normalize widget types to PascalCase
-    if (loadedUiStructure) {
-      loadedUiStructure = this.normalizeUiStructure(loadedUiStructure);
-      console.log('CanvasStateService - After normalization:', loadedUiStructure);
-    } else {
-      console.log('CanvasStateService - ui_structure is null/undefined, creating empty root');
-    }
-
-    // Load the UI structure
-    const widgetToLoad = loadedUiStructure || this.createEmptyRoot();
-    console.log('CanvasStateService - Final widget to load:', widgetToLoad);
-
+    // Clear current state
     this.updateState({
-      rootWidget: widgetToLoad
+      rootWidget: null,
+      selectedWidgetId: null,
+      hoveredWidgetId: null
     });
 
-    // Reset history for new screen
-    this.history = [widgetToLoad];
-    this.historyIndex = 0;
-    this.hasUnsavedChanges = false;
+    this.screenService.getScreen(screenId).subscribe({
+      next: (screen) => {
+        console.log('CanvasStateService - Raw screen from backend:', screen);
 
-    console.log(`Loaded screen: ${screen.name}`);
-  },
-    error: (error) => {
-      console.error('Error loading screen:', error);
-      // Create empty root on error
-      this.updateState({
-        rootWidget: this.createEmptyRoot()
-      });
+        let loadedUiStructure = screen.ui_structure;
+
+        // Normalize the UI structure to ensure all 'children' properties are arrays
+        // AND normalize widget types to PascalCase
+        if (loadedUiStructure) {
+          loadedUiStructure = this.normalizeUiStructure(loadedUiStructure);
+          console.log('CanvasStateService - After normalization:', loadedUiStructure);
+        } else {
+          console.log('CanvasStateService - ui_structure is null/undefined, creating empty root');
+        }
+
+        // Load the UI structure
+        const widgetToLoad = loadedUiStructure || this.createEmptyRoot();
+        console.log('CanvasStateService - Final widget to load:', widgetToLoad);
+
+        this.updateState({
+          rootWidget: widgetToLoad
+        });
+
+        // Reset history for new screen
+        this.history = [widgetToLoad];
+        this.historyIndex = 0;
+        this.hasUnsavedChanges = false;
+
+        console.log(`Loaded screen: ${screen.name}`);
+      },
+      error: (error) => {
+        console.error('Error loading screen:', error);
+        // Create empty root on error
+        this.updateState({
+          rootWidget: this.createEmptyRoot()
+        });
+      }
+    });
+  }
+
+  /**
+   * Normalize widget type from backend format to frontend enum format
+   * Converts lowercase types to PascalCase (e.g., "column" -> "Column")
+   */
+  private normalizeWidgetType(type: string): WidgetType {
+    if (!type) {
+      return WidgetType.CUSTOM; // Fallback for empty or null types
     }
-  });
-}
 
-/**
- * Normalize widget type from backend format to frontend enum format
- * Converts lowercase types to PascalCase (e.g., "column" -> "Column")
- */
-private normalizeWidgetType(type: string): WidgetType {
-  if (!type) {
-    return WidgetType.CUSTOM; // Fallback for empty or null types
+    // Convert first letter to uppercase, rest to lowercase
+    // This handles cases like "column" -> "Column" and "Scaffold" -> "Scaffold"
+    const normalizedType = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+
+    // Special cases mapping if backend uses different names than enum
+    const typeMapping: Record<string, WidgetType> = {
+      'appbar': WidgetType.APP_BAR,
+      'sizedbox': WidgetType.SIZED_BOX,
+      'listview': WidgetType.LIST_VIEW,
+      'gridview': WidgetType.GRID_VIEW,
+      'textfield': WidgetType.TEXT_FIELD,
+      'textformfield': WidgetType.TEXT_FORM_FIELD,
+      'elevatedbutton': WidgetType.ELEVATED_BUTTON,
+      'textbutton': WidgetType.TEXT_BUTTON,
+      'outlinedbutton': WidgetType.OUTLINED_BUTTON,
+      'iconbutton': WidgetType.ICON_BUTTON,
+      'listtile': WidgetType.LIST_TILE,
+      'dropdownbutton': WidgetType.DROPDOWN_BUTTON,
+      'circularprogressindicator': WidgetType.CIRCULAR_PROGRESS,
+      'linearprogressindicator': WidgetType.LINEAR_PROGRESS,
+      'bottomnavigationbar': WidgetType.BOTTOM_NAV_BAR,
+      'tabbar': WidgetType.TAB_BAR,
+      'floatingactionbutton': WidgetType.FAB,
+      'popupmenubutton': WidgetType.POPUP_MENU,
+      'aspectratio': WidgetType.ASPECT_RATIO,
+      'fittedbox': WidgetType.FITTED_BOX
+    };
+
+    // Check if we have a special mapping for this type
+    const lowerType = type.toLowerCase();
+    if (typeMapping[lowerType]) {
+      return typeMapping[lowerType];
+    }
+
+    // Otherwise, use the simple capitalized version
+    return normalizedType as WidgetType;
   }
 
-  // Convert first letter to uppercase, rest to lowercase
-  // This handles cases like "column" -> "Column" and "Scaffold" -> "Scaffold"
-  const normalizedType = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+  /**
+   * Recursively normalizes the UI structure:
+   * - Ensures 'children' property is an array
+   * - Converts widget 'type' to PascalCase
+   */
+  private normalizeUiStructure(widget: any): FlutterWidget {
+    // Ensure widget has an ID
+    if (!widget.id) {
+      widget.id = uuidv4();
+    }
 
-  // Special cases mapping if backend uses different names than enum
-  const typeMapping: Record<string, WidgetType> = {
-    'appbar': WidgetType.APP_BAR,
-    'sizedbox': WidgetType.SIZED_BOX,
-    'listview': WidgetType.LIST_VIEW,
-    'gridview': WidgetType.GRID_VIEW,
-    'textfield': WidgetType.TEXT_FIELD,
-    'textformfield': WidgetType.TEXT_FORM_FIELD,
-    'elevatedbutton': WidgetType.ELEVATED_BUTTON,
-    'textbutton': WidgetType.TEXT_BUTTON,
-    'outlinedbutton': WidgetType.OUTLINED_BUTTON,
-    'iconbutton': WidgetType.ICON_BUTTON,
-    'listtile': WidgetType.LIST_TILE,
-    'dropdownbutton': WidgetType.DROPDOWN_BUTTON,
-    'circularprogressindicator': WidgetType.CIRCULAR_PROGRESS,
-    'linearprogressindicator': WidgetType.LINEAR_PROGRESS,
-    'bottomnavigationbar': WidgetType.BOTTOM_NAV_BAR,
-    'tabbar': WidgetType.TAB_BAR,
-    'floatingactionbutton': WidgetType.FAB,
-    'popupmenubutton': WidgetType.POPUP_MENU,
-    'aspectratio': WidgetType.ASPECT_RATIO,
-    'fittedbox': WidgetType.FITTED_BOX
-  };
+    // Normalize the widget type
+    widget.type = this.normalizeWidgetType(widget.type);
 
-  // Check if we have a special mapping for this type
-  const lowerType = type.toLowerCase();
-  if (typeMapping[lowerType]) {
-    return typeMapping[lowerType];
+    // Ensure children is an array and recursively normalize children
+    if (!Array.isArray(widget.children)) {
+      widget.children = [];
+    }
+
+    widget.children = widget.children.map((child: any) => this.normalizeUiStructure(child));
+
+    // Ensure properties object exists
+    if (!widget.properties) {
+      widget.properties = {};
+    }
+
+    return widget as FlutterWidget;
   }
-
-  // Otherwise, use the simple capitalized version
-  return normalizedType as WidgetType;
-}
-
-/**
- * Recursively normalizes the UI structure:
- * - Ensures 'children' property is an array
- * - Converts widget 'type' to PascalCase
- */
-private normalizeUiStructure(widget: any): FlutterWidget {
-  // Normalize the widget type
-  widget.type = this.normalizeWidgetType(widget.type);
-
-  // Ensure children is an array and recursively normalize children
-  if (!Array.isArray(widget.children)) {
-    widget.children = [];
-  }
-
-  widget.children = widget.children.map((child: any) => this.normalizeUiStructure(child));
-
-  return widget as FlutterWidget;
-}
 
   // Save current state to backend
   saveToBackend(): Observable<any> {
@@ -226,17 +236,17 @@ private normalizeUiStructure(widget: any): FlutterWidget {
 
   // Create empty root widget
   private createEmptyRoot(): FlutterWidget {
-  return {
-    id: uuidv4(),
-    type: WidgetType.CONTAINER,
-    properties: {
-      width: undefined,
-      height: undefined,
-      color: '#FFFFFF'
-    },
-    children: [] // Always ensure this is an array
-  };
-}
+    return {
+      id: uuidv4(),
+      type: WidgetType.CONTAINER,
+      properties: {
+        width: undefined,
+        height: undefined,
+        color: '#FFFFFF'
+      },
+      children: [] // Always ensure this is an array
+    };
+  }
 
   // Get current screen ID
   getCurrentScreenId(): number | null {
@@ -263,7 +273,7 @@ private normalizeUiStructure(widget: any): FlutterWidget {
    */
   loadSampleWidgetTree(): void {
     const sampleTree = this.widgetRegistry.createSampleWidgetTree();
-    this.updateState({ rootWidget: sampleTree });
+    this.updateState({rootWidget: sampleTree});
     this.saveToHistory(sampleTree);
   }
 
@@ -293,62 +303,62 @@ private normalizeUiStructure(widget: any): FlutterWidget {
    * Add a new widget to the canvas
    */
   addWidget(widgetType: WidgetType, parentId?: string | null, index?: number): void {
-  console.log('CanvasStateService: addWidget called with widgetType:', widgetType);
-  console.log('  - typeof widgetType:', typeof widgetType);
-  console.log('  - parentId:', parentId);
-  console.log('  - index:', index);
+    console.log('CanvasStateService: addWidget called with widgetType:', widgetType);
+    console.log('  - typeof widgetType:', typeof widgetType);
+    console.log('  - parentId:', parentId);
+    console.log('  - index:', index);
 
-  if (!widgetType) {
-    console.error('CanvasStateService: ERROR! widgetType is undefined or null');
-    return;
-  }
-
-  try {
-    console.log('CanvasStateService: About to call createWidget with type:', widgetType);
-    const newWidget = this.widgetRegistry.createWidget(widgetType);
-    console.log('CanvasStateService: Created new widget:', newWidget);
-
-    const updatedRoot = this.treeService.addWidget(
-      this.currentState.rootWidget,
-      newWidget,
-      parentId || null,
-      index
-    );
-    console.log('CanvasStateService: Tree service returned updatedRoot:', updatedRoot);
-
-    if (updatedRoot !== this.currentState.rootWidget) {
-      console.log('CanvasStateService: Root changed, updating state');
-      this.updateState({
-        rootWidget: updatedRoot,
-        selectedWidgetId: newWidget.id
-      });
-      this.saveToHistory(updatedRoot);
-
-      // Sync with backend if screen is loaded
-      if (this.currentScreenId) {
-        console.log('CanvasStateService: Syncing with backend for screen:', this.currentScreenId);
-        this.screenService.addWidget(this.currentScreenId, {
-          widget_type: widgetType,
-          parent_id: parentId,
-          index: index,
-          properties: newWidget.properties
-        }).subscribe({
-          next: (response) => {
-            console.log('CanvasStateService: Widget added to backend successfully');
-          },
-          error: (error) => {
-            console.error('CanvasStateService: Error syncing with backend:', error);
-          }
-        });
-      }
-    } else {
-      console.warn('CanvasStateService: Root did not change after adding widget');
+    if (!widgetType) {
+      console.error('CanvasStateService: ERROR! widgetType is undefined or null');
+      return;
     }
-  } catch (error) {
-    console.error('CanvasStateService: Error adding widget:', error);
-    console.error('CanvasStateService: Error stack:', (error as Error).stack);
+
+    try {
+      console.log('CanvasStateService: About to call createWidget with type:', widgetType);
+      const newWidget = this.widgetRegistry.createWidget(widgetType);
+      console.log('CanvasStateService: Created new widget:', newWidget);
+
+      const updatedRoot = this.treeService.addWidget(
+        this.currentState.rootWidget,
+        newWidget,
+        parentId || null,
+        index
+      );
+      console.log('CanvasStateService: Tree service returned updatedRoot:', updatedRoot);
+
+      if (updatedRoot !== this.currentState.rootWidget) {
+        console.log('CanvasStateService: Root changed, updating state');
+        this.updateState({
+          rootWidget: updatedRoot,
+          selectedWidgetId: newWidget.id
+        });
+        this.saveToHistory(updatedRoot);
+
+        // Sync with backend if screen is loaded
+        if (this.currentScreenId) {
+          console.log('CanvasStateService: Syncing with backend for screen:', this.currentScreenId);
+          this.screenService.addWidget(this.currentScreenId, {
+            widget_type: widgetType,
+            parent_id: parentId,
+            index: index,
+            properties: newWidget.properties
+          }).subscribe({
+            next: (response) => {
+              console.log('CanvasStateService: Widget added to backend successfully');
+            },
+            error: (error) => {
+              console.error('CanvasStateService: Error syncing with backend:', error);
+            }
+          });
+        }
+      } else {
+        console.warn('CanvasStateService: Root did not change after adding widget');
+      }
+    } catch (error) {
+      console.error('CanvasStateService: Error adding widget:', error);
+      console.error('CanvasStateService: Error stack:', (error as Error).stack);
+    }
   }
-}
 
   /**
    * Add a widget with drop position (for drag and drop)
@@ -375,7 +385,7 @@ private normalizeUiStructure(widget: any): FlutterWidget {
     );
 
     if (updatedRoot && updatedRoot !== this.currentState.rootWidget) {
-      this.updateState({ rootWidget: updatedRoot });
+      this.updateState({rootWidget: updatedRoot});
       this.saveToHistory(updatedRoot);
     }
   }
@@ -384,14 +394,14 @@ private normalizeUiStructure(widget: any): FlutterWidget {
    * Select a widget by ID
    */
   selectWidget(widgetId: string | null): void {
-    this.updateState({ selectedWidgetId: widgetId });
+    this.updateState({selectedWidgetId: widgetId});
   }
 
   /**
    * Set hover state for a widget
    */
   setHoveredWidget(widgetId: string | null): void {
-    this.updateState({ hoveredWidgetId: widgetId });
+    this.updateState({hoveredWidgetId: widgetId});
   }
 
   /**
@@ -420,7 +430,7 @@ private normalizeUiStructure(widget: any): FlutterWidget {
    * Update drag preview position
    */
   updateDragPreview(preview: DragPreview | null): void {
-    this.updateState({ dragPreview: preview });
+    this.updateState({dragPreview: preview});
   }
 
   /**
