@@ -117,7 +117,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track $index; let i = $index) {
+              @for (child of widget.children; track child; let i = $index) {
                 <div class="child-wrapper-horizontal">
                   @if (showDropIndicator(i)) {
                     <div class="drop-indicator-vertical"></div>
@@ -151,7 +151,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             [class.drop-zone-active]="isDragOver">
 
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track $index; let i = $index) {
+              @for (child of widget.children; track child; let i = $index) {
                 <div class="absolute" [ngStyle]="getStackChildPosition(i, child)">
                   <app-widget-renderer
                     [widget]="child"
@@ -349,7 +349,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
             (dragleave)="onDragLeave($event)"
             [class.drop-zone-active]="isDragOver">
             @if (widget.children.length > 0) {
-              @for (child of widget.children; track $index; let i = $index) {
+              @for (child of widget.children; track child; let i = $index) {
                 <div class="list-item-wrapper">
                   @if (showDropIndicator(i)) {
                     <div class="drop-indicator-horizontal"></div>
