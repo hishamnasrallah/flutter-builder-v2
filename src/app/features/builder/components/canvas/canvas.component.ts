@@ -151,25 +151,39 @@ export class CanvasComponent implements OnInit, OnDestroy {
   }
 
   onDrop(event: DragEvent) {
-    event.preventDefault();
-    event.stopPropagation();
+  event.preventDefault();
+  event.stopPropagation();
 
-    this.isDragOver = false;
+  console.log('CanvasComponent: Drop event triggered');
+  this.isDragOver = false;
 
-    try {
-      const dataText = event.dataTransfer!.getData('application/json');
-      if (!dataText) return;
+  try {
+    const dataText = event.dataTransfer!.getData('application/json');
+    console.log('CanvasComponent: Raw data from dataTransfer:', dataText);
 
-      const dragData = JSON.parse(dataText) as DragData;
-
-      if (!this.rootWidget && dragData.type === 'new-widget' && dragData.widgetType) {
-        // Add as root widget
-        this.canvasState.addWidget(dragData.widgetType, null);
-      }
-    } catch (error) {
-      console.error('Error handling drop:', error);
+    if (!dataText) {
+      console.error('CanvasComponent: No data in dataTransfer');
+      return;
     }
+
+    const dragData = JSON.parse(dataText) as DragData;
+console.log('CanvasComponent Drop Handler: Parsed dragData:', dragData);
+console.log('CanvasComponent Drop Handler: dragData.widgetType (from parsed data):', dragData.widgetType);
+
+if (!this.rootWidget && dragData.type === 'new-widget' && dragData.widgetType) {
+  console.log('CanvasComponent: Adding widget as root with type:', dragData.widgetType);
+  this.canvasState.addWidget(dragData.widgetType, null);
+} else {
+  console.warn('CanvasComponent Drop Handler: Unhandled drag data type or missing required fields. dragData:', dragData);
+  console.log('  - Has rootWidget:', !!this.rootWidget);
+  console.log('  - dragData.type is "new-widget":', dragData.type === 'new-widget');
+  console.log('  - Has widgetType:', !!dragData.widgetType);
+}
+  } catch (error) {
+    console.error('CanvasComponent: Error handling drop:', error);
+    console.error('CanvasComponent: Error stack:', (error as Error).stack);
   }
+}
 
   onWidgetClick(widgetId: string) {
     this.canvasState.selectWidget(widgetId);

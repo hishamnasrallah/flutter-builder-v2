@@ -274,16 +274,32 @@ export class WidgetPaletteComponent implements OnInit {
   }
 
   private processDynamicWidgets(componentsByGroup: Record<string, ComponentTemplate[]>): void {
-    this.categoryGroups = Object.entries(componentsByGroup).map(([groupName, templates]) => ({
+  console.log('WidgetPaletteComponent: processDynamicWidgets called with:', componentsByGroup);
+
+  this.categoryGroups = Object.entries(componentsByGroup).map(([groupName, templates]) => {
+    console.log(`WidgetPaletteComponent: Processing group "${groupName}" with ${templates.length} templates`);
+
+    const widgets = templates.map(template => {
+      const widgetDef = this.mapTemplateToWidgetDefinition(template);
+      if (!widgetDef.type) {
+        console.error('WidgetPaletteComponent: ERROR! Created widget definition without type:', widgetDef);
+      }
+      return widgetDef;
+    });
+
+    return {
       category: groupName,
       displayName: groupName,
-      widgets: templates.map(template => this.mapTemplateToWidgetDefinition(template)),
+      widgets: widgets,
       isExpanded: groupName === 'Basic Layout' || groupName === 'Basic Display'
-    }));
+    };
+  });
 
-    this.categoryGroups = this.categoryGroups.filter(group => group.widgets.length > 0);
-    this.filteredGroups = [...this.categoryGroups];
-  }
+  this.categoryGroups = this.categoryGroups.filter(group => group.widgets.length > 0);
+  this.filteredGroups = [...this.categoryGroups];
+
+  console.log('WidgetPaletteComponent: Final category groups:', this.categoryGroups);
+}
 
   private groupTemplatesByCategory(templates: ComponentTemplate[]): Map<string, ComponentTemplate[]> {
     const grouped = new Map<string, ComponentTemplate[]>();
@@ -312,17 +328,30 @@ export class WidgetPaletteComponent implements OnInit {
   }
 
   private mapTemplateToWidgetDefinition(template: ComponentTemplate): WidgetDefinition {
-    return {
-      type: template.widget_type as WidgetType,
-      displayName: template.name,
-      icon: this.getIconForWidgetType(template.widget_type),
-      category: this.mapCategoryString(template.category),
-      isContainer: template.is_container,
-      acceptsChildren: template.is_container,
-      maxChildren: template.max_children,
-      defaultProperties: template.properties || {}
-    };
+  // Ensure widget_type is a string. If template.widget_type is undefined or null, default to 'Custom'.
+  const widgetType = (template.widget_type || template.name || 'Custom') as WidgetType;
+
+  const definition: WidgetDefinition = {
+    type: widgetType, // This is the critical assignment
+    displayName: template.name || widgetType,
+    icon: this.getIconForWidgetType(template.widget_type || widgetType),
+    category: this.mapCategoryString(template.category),
+    isContainer: template.is_container || false,
+    acceptsChildren: template.is_container || false,
+    maxChildren: template.max_children,
+    defaultProperties: template.properties || {}
+  };
+
+  console.log('WidgetPaletteComponent: Mapped template to WidgetDefinition:', definition);
+  console.log('  - definition.type:', definition.type);
+  console.log('  - typeof definition.type:', typeof definition.type);
+
+  if (!definition.type) {
+    console.error('ERROR: WidgetDefinition created without type!', definition);
   }
+
+  return definition;
+}
 
   private mapCategoryString(category: string): WidgetCategory {
     const categoryMap: Record<string, WidgetCategory> = {
@@ -336,8 +365,12 @@ export class WidgetPaletteComponent implements OnInit {
     return categoryMap[category.toLowerCase()] || WidgetCategory.BASIC;
   }
 
-  private getIconForWidgetType(widgetType: string): string {
-    const iconMap: Record<string, string> = {
+  private getIconForWidgetType(widgetType: string | undefined | null): string {
+  if (!widgetType) {
+    return '?';
+  }
+
+  const iconMap: Record<string, string> = {
       'Container': '□',
       'Text': 'T',
       'Column': '⬇',
@@ -439,25 +472,49 @@ export class WidgetPaletteComponent implements OnInit {
   }
 
   createDragData(widget: WidgetDefinition): DragData {
-    return {
-      type: 'new-widget',
-      widgetType: widget.type,
-      sourceData: widget
-    };
+  if (!widget.type) {
+    console.error('Widget definition missing type:', widget);
+    throw new Error('Cannot create drag data for widget without type');
   }
+
+  return {
+    type: 'new-widget',
+    widgetType: widget.type,
+    sourceData: widget
+  };
+}
 
   onNativeDragStart(event: DragEvent, widget: WidgetDefinition): void {
-    // Store widget data in dataTransfer
-    const dragData = this.createDragData(widget);
-    event.dataTransfer!.effectAllowed = 'copy';
-    event.dataTransfer!.setData('application/json', JSON.stringify(dragData));
+  console.log('WidgetPaletteComponent: onNativeDragStart - Received widget:', widget);
+  console.log('WidgetPaletteComponent: onNativeDragStart - widget.type (from received object):', widget.type);
 
-    // Add visual feedback
-    const element = event.target as HTMLElement;
-    element.classList.add('dragging');
-
-    this.canvasState.setDragging(true);
+  // Defensive programming: ensure widget.type exists
+  if (!widget.type) {
+    console.error('WidgetPaletteComponent: ERROR! Widget has no type property!');
+    console.error('  Full widget object:', JSON.stringify(widget, null, 2));
+    // Attempt to recover
+    widget.type = (widget.displayName || 'Custom').replace(/\s+/g, '') as WidgetType;
+    console.warn('WidgetPaletteComponent: Attempting recovery with type:', widget.type);
   }
+
+  const dragData: DragData = {
+    type: 'new-widget',
+    widgetType: widget.type, // This should now be correctly populated
+    sourceData: widget
+  };
+
+  console.log('WidgetPaletteComponent: onNativeDragStart - Created dragData:', dragData);
+  console.log('  - dragData.widgetType:', dragData.widgetType);
+
+  event.dataTransfer!.effectAllowed = 'copy';
+  event.dataTransfer!.setData('application/json', JSON.stringify(dragData));
+
+  // Add visual feedback
+  const element = event.target as HTMLElement;
+  element.classList.add('dragging');
+
+  this.canvasState.setDragging(true);
+}
 
   onNativeDragEnd(event: DragEvent): void {
     // Remove visual feedback

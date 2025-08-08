@@ -246,44 +246,62 @@ private normalizeWidgetChildren(widget: FlutterWidget): FlutterWidget {
    * Add a new widget to the canvas
    */
   addWidget(widgetType: WidgetType, parentId?: string | null, index?: number): void {
-    try {
-      const newWidget = this.widgetRegistry.createWidget(widgetType);
+  console.log('CanvasStateService: addWidget called with widgetType:', widgetType);
+  console.log('  - typeof widgetType:', typeof widgetType);
+  console.log('  - parentId:', parentId);
+  console.log('  - index:', index);
 
-      const updatedRoot = this.treeService.addWidget(
-        this.currentState.rootWidget,
-        newWidget,
-        parentId || null,
-        index
-      );
-
-      if (updatedRoot !== this.currentState.rootWidget) {
-        this.updateState({
-          rootWidget: updatedRoot,
-          selectedWidgetId: newWidget.id
-        });
-        this.saveToHistory(updatedRoot);
-
-        // Sync with backend if screen is loaded
-        if (this.currentScreenId) {
-          this.screenService.addWidget(this.currentScreenId, {
-            widget_type: widgetType,
-            parent_id: parentId,
-            index: index,
-            properties: newWidget.properties
-          }).subscribe({
-            next: (response) => {
-              console.log('Widget added to backend');
-            },
-            error: (error) => {
-              console.error('Error syncing with backend:', error);
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error adding widget:', error);
-    }
+  if (!widgetType) {
+    console.error('CanvasStateService: ERROR! widgetType is undefined or null');
+    return;
   }
+
+  try {
+    console.log('CanvasStateService: About to call createWidget with type:', widgetType);
+    const newWidget = this.widgetRegistry.createWidget(widgetType);
+    console.log('CanvasStateService: Created new widget:', newWidget);
+
+    const updatedRoot = this.treeService.addWidget(
+      this.currentState.rootWidget,
+      newWidget,
+      parentId || null,
+      index
+    );
+    console.log('CanvasStateService: Tree service returned updatedRoot:', updatedRoot);
+
+    if (updatedRoot !== this.currentState.rootWidget) {
+      console.log('CanvasStateService: Root changed, updating state');
+      this.updateState({
+        rootWidget: updatedRoot,
+        selectedWidgetId: newWidget.id
+      });
+      this.saveToHistory(updatedRoot);
+
+      // Sync with backend if screen is loaded
+      if (this.currentScreenId) {
+        console.log('CanvasStateService: Syncing with backend for screen:', this.currentScreenId);
+        this.screenService.addWidget(this.currentScreenId, {
+          widget_type: widgetType,
+          parent_id: parentId,
+          index: index,
+          properties: newWidget.properties
+        }).subscribe({
+          next: (response) => {
+            console.log('CanvasStateService: Widget added to backend successfully');
+          },
+          error: (error) => {
+            console.error('CanvasStateService: Error syncing with backend:', error);
+          }
+        });
+      }
+    } else {
+      console.warn('CanvasStateService: Root did not change after adding widget');
+    }
+  } catch (error) {
+    console.error('CanvasStateService: Error adding widget:', error);
+    console.error('CanvasStateService: Error stack:', (error as Error).stack);
+  }
+}
 
   /**
    * Add a widget with drop position (for drag and drop)

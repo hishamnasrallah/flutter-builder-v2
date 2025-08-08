@@ -251,9 +251,15 @@ export class WidgetRegistryService {
     this.widgetDefinitions.set(definition.type, definition);
   }
 
-  getWidgetDefinition(type: WidgetType): WidgetDefinition | undefined {
-    return this.widgetDefinitions.get(type);
+getWidgetDefinition(type: WidgetType): WidgetDefinition | undefined {
+  console.log('WidgetRegistryService: Looking for definition for type:', type);
+  const definition = this.widgetDefinitions.get(type);
+  console.log('WidgetRegistryService: Found definition:', definition ? 'Yes' : 'No');
+  if (!definition) {
+    console.log('WidgetRegistryService: Available types:', Array.from(this.widgetDefinitions.keys()));
   }
+  return definition;
+}
 
   getAllWidgetDefinitions(): WidgetDefinition[] {
     return Array.from(this.widgetDefinitions.values());
@@ -264,18 +270,37 @@ export class WidgetRegistryService {
   }
 
   createWidget(type: WidgetType, properties?: Partial<FlutterWidget['properties']>): FlutterWidget {
-    const definition = this.getWidgetDefinition(type);
-    if (!definition) {
-      throw new Error(`Unknown widget type: ${type}`);
-    }
+  console.log('WidgetRegistryService: createWidget called for type:', type, '(typeof:', typeof type, ')');
 
-    return {
-      id: uuidv4(),
-      type,
-      properties: { ...definition.defaultProperties, ...properties },
-      children: []
-    };
+  if (!type || typeof type !== 'string') {
+    console.error('WidgetRegistryService: Invalid widget type provided to createWidget:', type);
+    console.error('  - type value:', type);
+    console.error('  - type typeof:', typeof type);
+    console.error('  - type is null:', type === null);
+    console.error('  - type is undefined:', type === undefined);
+    throw new Error(`Invalid widget type provided: ${type}`);
   }
+
+  console.log('WidgetRegistryService: Looking for definition for valid type:', type);
+  const definition = this.getWidgetDefinition(type);
+
+  if (!definition) {
+    console.error('WidgetRegistryService: No definition found for type:', type);
+    console.error('Available widget types:', Array.from(this.widgetDefinitions.keys()));
+    throw new Error(`Unknown widget type: ${type}`);
+  }
+
+  console.log('WidgetRegistryService: Successfully found definition:', definition);
+
+  const widget = {
+    id: uuidv4(),
+    type,
+    properties: { ...definition.defaultProperties, ...properties },
+    children: []
+  };
+  console.log('WidgetRegistryService: Created widget:', widget);
+  return widget;
+}
 
   // Create a sample widget tree for Phase 1
   createSampleWidgetTree(): FlutterWidget {
@@ -404,24 +429,28 @@ export class WidgetRegistryService {
 
   // Method to register dynamic widget types from backend
   registerDynamicWidgetType(template: any): void {
-    const widgetType = template.widget_type as WidgetType;
+  const widgetType = template.widget_type as WidgetType;
+  console.log('WidgetRegistryService: Registering dynamic widget type:', widgetType, 'from template:', template);
 
-    // Only register if not already registered
-    if (!this.widgetDefinitions.has(widgetType)) {
-      const definition: WidgetDefinition = {
-        type: widgetType,
-        displayName: template.name,
-        icon: template.icon || '?',
-        category: this.mapTemplateCategory(template.category),
-        isContainer: template.is_container || false,
-        acceptsChildren: template.is_container || false,
-        maxChildren: template.max_children,
-        defaultProperties: template.properties || {}
-      };
+  // Only register if not already registered
+  if (!this.widgetDefinitions.has(widgetType)) {
+    const definition: WidgetDefinition = {
+      type: widgetType,
+      displayName: template.name,
+      icon: template.icon || '?',
+      category: this.mapTemplateCategory(template.category),
+      isContainer: template.is_container || false,
+      acceptsChildren: template.is_container || false,
+      maxChildren: template.max_children,
+      defaultProperties: template.properties || {}
+    };
 
-      this.registerWidget(definition);
-    }
+    console.log('WidgetRegistryService: Registering new definition:', definition);
+    this.registerWidget(definition);
+  } else {
+    console.log('WidgetRegistryService: Widget type already registered:', widgetType);
   }
+}
 
   private mapTemplateCategory(category: string): WidgetCategory {
     const categoryMap: Record<string, WidgetCategory> = {

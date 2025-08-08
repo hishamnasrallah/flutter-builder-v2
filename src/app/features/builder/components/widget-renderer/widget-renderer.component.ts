@@ -524,6 +524,7 @@ import {SelectionService} from '../../../../core/services/selection.service';
     .widget-multi-selected {
       @apply outline outline-2 outline-purple-500 outline-offset-2 !important;
     }
+
     .flutter-card {
       @apply bg-white rounded-lg shadow-md;
       min-height: 80px;
@@ -658,17 +659,28 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
     event.preventDefault();
     event.stopPropagation();
 
+    console.log('WidgetRendererComponent: Drop event on widget:', this.widget.type, 'with id:', this.widget.id);
     this.isDragOver = false;
 
     try {
       const dataText = event.dataTransfer!.getData('application/json');
-      if (!dataText) return;
+      console.log('WidgetRendererComponent: Raw data from dataTransfer:', dataText);
+
+      if (!dataText) {
+        console.error('WidgetRendererComponent: No data in dataTransfer');
+        return;
+      }
 
       const dragData = JSON.parse(dataText) as DragData;
+      console.log('WidgetRendererComponent: Parsed dragData:', dragData);
 
       // Check max children constraint
       const maxChildren = this.widgetRegistry.getMaxChildren(this.widget.type);
+      console.log('WidgetRendererComponent: Max children for', this.widget.type, ':', maxChildren);
+      console.log('WidgetRendererComponent: Current children count:', this.widget.children.length);
+
       if (maxChildren !== undefined && this.widget.children.length >= maxChildren) {
+        console.warn('WidgetRendererComponent: Max children reached');
         const notification = (window as any).notificationService;
         if (notification) {
           notification.showWarning(`${this.widget.type} can only have ${maxChildren} child widget(s)`);
@@ -678,8 +690,13 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
 
       // Calculate drop index based on mouse position
       const dropIndex = this.calculateDropIndex(event);
+      console.log('WidgetRendererComponent: Calculated drop index:', dropIndex);
 
       if (dragData.type === 'new-widget' && dragData.widgetType) {
+        console.log('WidgetRendererComponent: Adding new widget of type:', dragData.widgetType);
+        console.log('WidgetRendererComponent: Parent widget id:', this.widget.id);
+        console.log('WidgetRendererComponent: Drop index:', dropIndex);
+
         // Add new widget at calculated position
         this.canvasState.addWidgetAtDropPosition(
           dragData.widgetType,
@@ -687,10 +704,7 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
           dropIndex
         );
       } else if (dragData.type === 'existing-widget' && dragData.widgetId) {
-        // Don't allow dropping on self or descendants
-        if (dragData.widgetId === this.widget.id) {
-          return;
-        }
+        console.log('WidgetRendererComponent: Moving existing widget:', dragData.widgetId);
 
         // Check if we're trying to drop a parent into its child
         if (this.isDescendantOf(dragData.widgetId)) {
@@ -704,6 +718,8 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
           this.widget.id,
           dropIndex
         );
+      } else {
+          console.warn('WidgetRenderer Drop Handler: Unhandled drag data type or missing required fields. dragData:', dragData);
       }
     } catch (error) {
       console.error('Error handling drop:', error);
@@ -952,6 +968,7 @@ export class WidgetRendererComponent implements OnInit, OnChanges {
     };
     return alignmentMap[alignment] || ['flex-start', 'flex-start'];
   }
+
   getCardStyles(): any {
     const props = this.widget.properties;
     const styles: any = {};
