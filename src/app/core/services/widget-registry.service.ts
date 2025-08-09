@@ -22,7 +22,7 @@ interface BackendComponentTemplate {
   name: string;
   category: string;
   icon: string;
-  description?: string; // Make this optional
+  description?: string;
   default_properties: any;
   can_have_children: boolean;
   max_children?: number;
@@ -32,44 +32,430 @@ interface BackendComponentTemplate {
   show_in_builder?: boolean;
 }
 
+// Enhanced metadata for properties
+export interface PropertyMetadata {
+  key: string;
+  type: 'text' | 'number' | 'color' | 'select' | 'spacing' | 'boolean' | 'alignment' | 'icon' | 'decoration' | 'border';
+  category: string;
+  defaultValue: any;
+  options?: { label: string; value: any }[];
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  validation?: any[];
+  dependsOn?: string[];
+  flutterType?: string; // Store the original Flutter type (e.g., 'EdgeInsets', 'BoxDecoration')
+}
+
+// Enhanced widget definition with property metadata
+export interface EnhancedWidgetDefinition extends WidgetDefinition {
+  propertyMetadata: Map<string, PropertyMetadata>;
+  renderType?: 'container' | 'text' | 'layout' | 'input' | 'display' | 'custom';
+  htmlElement?: string; // The HTML element to use for rendering
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class WidgetRegistryService {
-  private widgetDefinitions: Map<WidgetType, WidgetDefinition> = new Map();
+  private widgetDefinitions: Map<WidgetType, EnhancedWidgetDefinition> = new Map();
+  private propertyTypeInferenceRules: Map<string, PropertyMetadata> = new Map();
 
   constructor() {
-    // No static initialization here anymore
+    this.initializePropertyInferenceRules();
   }
 
-  // New method to register definitions from backend data
+  private initializePropertyInferenceRules() {
+    // Define common property patterns and their metadata
+    this.propertyTypeInferenceRules.set('width', {
+      key: 'width',
+      type: 'number',
+      category: 'Layout',
+      defaultValue: null,
+      min: 0,
+      max: 1000,
+      step: 10,
+      unit: 'px'
+    });
+
+    this.propertyTypeInferenceRules.set('height', {
+      key: 'height',
+      type: 'number',
+      category: 'Layout',
+      defaultValue: null,
+      min: 0,
+      max: 1000,
+      step: 10,
+      unit: 'px'
+    });
+
+    this.propertyTypeInferenceRules.set('padding', {
+      key: 'padding',
+      type: 'spacing',
+      category: 'Spacing',
+      defaultValue: createEdgeInsets(0),
+      flutterType: 'EdgeInsets'
+    });
+
+    this.propertyTypeInferenceRules.set('margin', {
+      key: 'margin',
+      type: 'spacing',
+      category: 'Spacing',
+      defaultValue: createEdgeInsets(0),
+      flutterType: 'EdgeInsets'
+    });
+
+    // Add more common patterns
+    this.propertyTypeInferenceRules.set('fontSize', {
+      key: 'fontSize',
+      type: 'number',
+      category: 'Typography',
+      defaultValue: 14,
+      min: 8,
+      max: 72,
+      step: 1,
+      unit: 'px'
+    });
+
+    this.propertyTypeInferenceRules.set('elevation', {
+      key: 'elevation',
+      type: 'number',
+      category: 'Appearance',
+      defaultValue: 0,
+      min: 0,
+      max: 24,
+      step: 1
+    });
+
+    this.propertyTypeInferenceRules.set('borderRadius', {
+      key: 'borderRadius',
+      type: 'number',
+      category: 'Appearance',
+      defaultValue: 0,
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: 'px'
+    });
+  }
+
+  // Enhanced method to register definitions with comprehensive metadata
   registerWidgetDefinition(template: BackendComponentTemplate): void {
     const widgetType = this.normalizeBackendWidgetType(template.flutter_widget);
     const category = this.mapBackendCategoryToFrontend(template.category);
-    const icon = this.mapBackendIconToFrontend(template.icon); // Map backend icon name to actual icon character/code
+    const icon = this.mapBackendIconToFrontend(template.icon);
 
-    const definition: WidgetDefinition = {
+    // Determine render type based on widget
+    const renderType = this.determineRenderType(template.flutter_widget);
+    const htmlElement = this.determineHtmlElement(template.flutter_widget);
+
+    // Generate property metadata
+    const propertyMetadata = this.generatePropertyMetadata(template.default_properties, widgetType);
+
+    const definition: EnhancedWidgetDefinition = {
       type: widgetType,
       displayName: template.name,
       icon: icon,
       category: category,
-      isContainer: template.can_have_children, // Assuming can_have_children implies container
+      isContainer: template.can_have_children,
       acceptsChildren: template.can_have_children,
       maxChildren: template.max_children,
-      defaultProperties: this.parseBackendProperties(template.default_properties, widgetType)
+      defaultProperties: this.parseBackendProperties(template.default_properties, widgetType),
+      propertyMetadata: propertyMetadata,
+      renderType: renderType,
+      htmlElement: htmlElement
     };
+
     this.widgetDefinitions.set(widgetType, definition);
+  }
+
+  private determineRenderType(flutterWidget: string): 'container' | 'text' | 'layout' | 'input' | 'display' | 'custom' {
+    const widget = flutterWidget.toLowerCase();
+
+    if (['container', 'card', 'scaffold'].includes(widget)) return 'container';
+    if (['text', 'richtext'].includes(widget)) return 'text';
+    if (['column', 'row', 'stack', 'wrap', 'listview', 'gridview'].includes(widget)) return 'layout';
+    if (['textfield', 'textformfield', 'button', 'elevatedbutton', 'textbutton', 'outlinedbutton', 'iconbutton', 'checkbox', 'switch', 'radio', 'slider', 'dropdown'].includes(widget)) return 'input';
+    if (['image', 'icon', 'divider', 'circularprogressindicator', 'linearprogressindicator'].includes(widget)) return 'display';
+
+    return 'custom';
+  }
+
+  private determineHtmlElement(flutterWidget: string): string {
+    const widget = flutterWidget.toLowerCase();
+
+    const elementMap: { [key: string]: string } = {
+      'text': 'span',
+      'richtext': 'span',
+      'container': 'div',
+      'column': 'div',
+      'row': 'div',
+      'stack': 'div',
+      'textfield': 'input',
+      'textformfield': 'input',
+      'button': 'button',
+      'elevatedbutton': 'button',
+      'textbutton': 'button',
+      'outlinedbutton': 'button',
+      'iconbutton': 'button',
+      'image': 'img',
+      'icon': 'span',
+      'divider': 'hr',
+      'card': 'div',
+      'scaffold': 'div',
+      'appbar': 'header',
+      'drawer': 'aside',
+      'listview': 'div',
+      'gridview': 'div'
+    };
+
+    return elementMap[widget] || 'div';
+  }
+
+  private generatePropertyMetadata(defaultProperties: any, widgetType: WidgetType): Map<string, PropertyMetadata> {
+    const metadata = new Map<string, PropertyMetadata>();
+
+    for (const key in defaultProperties) {
+      if (defaultProperties.hasOwnProperty(key)) {
+        const value = defaultProperties[key];
+
+        // Check if we have a predefined rule for this property
+        let propMetadata = this.propertyTypeInferenceRules.get(key);
+
+        if (!propMetadata) {
+          // Infer metadata from key and value
+          propMetadata = this.inferPropertyMetadata(key, value);
+        }
+
+        metadata.set(key, { ...propMetadata, defaultValue: value });
+      }
+    }
+
+    return metadata;
+  }
+
+  private inferPropertyMetadata(key: string, value: any): PropertyMetadata {
+    const metadata: PropertyMetadata = {
+      key: key,
+      type: 'text',
+      category: 'General',
+      defaultValue: value
+    };
+
+    // Infer type from key patterns
+    const keyLower = key.toLowerCase();
+
+    // Color properties
+    if (keyLower.includes('color')) {
+      metadata.type = 'color';
+      metadata.category = 'Appearance';
+    }
+    // Spacing properties
+    else if (keyLower.includes('padding') || keyLower.includes('margin')) {
+      metadata.type = 'spacing';
+      metadata.category = 'Spacing';
+      metadata.flutterType = 'EdgeInsets';
+    }
+    // Alignment properties
+    else if (keyLower.includes('alignment')) {
+      metadata.type = 'alignment';
+      metadata.category = 'Layout';
+
+      if (keyLower.includes('mainaxis')) {
+        metadata.type = 'select';
+        metadata.options = this.getMainAxisAlignmentOptions();
+      } else if (keyLower.includes('crossaxis')) {
+        metadata.type = 'select';
+        metadata.options = this.getCrossAxisAlignmentOptions();
+      }
+    }
+    // Size properties
+    else if (keyLower.includes('width') || keyLower.includes('height') || keyLower.includes('size')) {
+      metadata.type = 'number';
+      metadata.category = 'Layout';
+      metadata.min = 0;
+      metadata.max = 1000;
+      metadata.step = 1;
+      metadata.unit = 'px';
+    }
+    // Font properties
+    else if (keyLower.includes('font')) {
+      metadata.category = 'Typography';
+
+      if (keyLower.includes('size')) {
+        metadata.type = 'number';
+        metadata.min = 8;
+        metadata.max = 72;
+        metadata.step = 1;
+        metadata.unit = 'px';
+      } else if (keyLower.includes('weight')) {
+        metadata.type = 'select';
+        metadata.options = this.getFontWeightOptions();
+      } else if (keyLower.includes('style')) {
+        metadata.type = 'select';
+        metadata.options = this.getFontStyleOptions();
+      }
+    }
+    // Text properties
+    else if (keyLower.includes('text')) {
+      if (keyLower.includes('align')) {
+        metadata.type = 'select';
+        metadata.category = 'Typography';
+        metadata.options = this.getTextAlignOptions();
+      } else {
+        metadata.type = 'text';
+        metadata.category = 'Content';
+      }
+    }
+    // Boolean properties
+    else if (typeof value === 'boolean') {
+      metadata.type = 'boolean';
+      metadata.category = 'Behavior';
+    }
+    // Number properties
+    else if (typeof value === 'number') {
+      metadata.type = 'number';
+      metadata.category = 'General';
+      metadata.min = 0;
+      metadata.max = 100;
+      metadata.step = 1;
+    }
+    // Icon properties
+    else if (keyLower === 'icon') {
+      metadata.type = 'select';
+      metadata.category = 'Content';
+      metadata.options = this.getIconOptions();
+    }
+    // Decoration properties
+    else if (keyLower.includes('decoration')) {
+      metadata.type = 'decoration';
+      metadata.category = 'Appearance';
+      metadata.flutterType = 'BoxDecoration';
+    }
+    // Border properties
+    else if (keyLower.includes('border')) {
+      if (keyLower.includes('radius')) {
+        metadata.type = 'number';
+        metadata.category = 'Appearance';
+        metadata.min = 0;
+        metadata.max = 100;
+        metadata.step = 1;
+        metadata.unit = 'px';
+      } else if (keyLower.includes('width')) {
+        metadata.type = 'number';
+        metadata.category = 'Appearance';
+        metadata.min = 0;
+        metadata.max = 20;
+        metadata.step = 1;
+        metadata.unit = 'px';
+      } else if (keyLower.includes('color')) {
+        metadata.type = 'color';
+        metadata.category = 'Appearance';
+      }
+    }
+
+    return metadata;
+  }
+
+  private getMainAxisAlignmentOptions(): { label: string; value: any }[] {
+    return Object.entries(MainAxisAlignment).map(([k, v]) => ({
+      label: this.humanizeLabel(k),
+      value: v
+    }));
+  }
+
+  private getCrossAxisAlignmentOptions(): { label: string; value: any }[] {
+    return Object.entries(CrossAxisAlignment).map(([k, v]) => ({
+      label: this.humanizeLabel(k),
+      value: v
+    }));
+  }
+
+  private getFontWeightOptions(): { label: string; value: any }[] {
+    return Object.entries(FontWeight).map(([k, v]) => ({
+      label: k,
+      value: v
+    }));
+  }
+
+  private getFontStyleOptions(): { label: string; value: any }[] {
+    return Object.entries(FontStyle).map(([k, v]) => ({
+      label: this.humanizeLabel(k),
+      value: v
+    }));
+  }
+
+  private getTextAlignOptions(): { label: string; value: any }[] {
+    return Object.entries(TextAlign).map(([k, v]) => ({
+      label: this.humanizeLabel(k),
+      value: v
+    }));
+  }
+
+  private getIconOptions(): { label: string; value: any }[] {
+    return [
+      { label: 'Star', value: 'star' },
+      { label: 'Heart', value: 'heart' },
+      { label: 'Home', value: 'home' },
+      { label: 'Settings', value: 'settings' },
+      { label: 'User', value: 'user' },
+      { label: 'Search', value: 'search' },
+      { label: 'Menu', value: 'menu' },
+      { label: 'Close', value: 'close' },
+      { label: 'Check', value: 'check' },
+      { label: 'Arrow Back', value: 'arrow_back' },
+      { label: 'Arrow Forward', value: 'arrow_forward' },
+      { label: 'Add', value: 'add' },
+      { label: 'Remove', value: 'remove' },
+      { label: 'Edit', value: 'edit' },
+      { label: 'Delete', value: 'delete' },
+      { label: 'Share', value: 'share' },
+      { label: 'Favorite', value: 'favorite' },
+      { label: 'Shopping Cart', value: 'shopping_cart' },
+      { label: 'Notifications', value: 'notifications' }
+    ];
+  }
+
+  private humanizeLabel(str: string): string {
+    return str.replace(/_/g, ' ')
+      .replace(/([A-Z])/g, ' $1')
+      .trim()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  getWidgetDefinition(type: WidgetType): EnhancedWidgetDefinition | undefined {
+    return this.widgetDefinitions.get(type);
+  }
+
+  getAllWidgetDefinitions(): EnhancedWidgetDefinition[] {
+    return Array.from(this.widgetDefinitions.values());
+  }
+
+  getPropertyMetadata(widgetType: WidgetType, propertyKey: string): PropertyMetadata | undefined {
+    const definition = this.getWidgetDefinition(widgetType);
+    return definition?.propertyMetadata.get(propertyKey);
   }
 
   // Helper to normalize backend widget type string to WidgetType enum
   public normalizeBackendWidgetType(backendType: string): WidgetType {
-    // Convert backend's snake_case or lowercase to PascalCase for WidgetType enum
-    // Example: 'text_field' -> 'TextField', 'container' -> 'Container'
-    const pascalCaseType = backendType.split('_')
-                                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                                    .join('');
-    // Use a direct mapping if PascalCase doesn't match enum exactly
+    const pascalCaseType = backendType.split(/[_-]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join('');
+
     const directMap: { [key: string]: WidgetType } = {
+      'Container': WidgetType.CONTAINER,
+      'Text': WidgetType.TEXT,
+      'Column': WidgetType.COLUMN,
+      'Row': WidgetType.ROW,
+      'Stack': WidgetType.STACK,
+      'Padding': WidgetType.PADDING,
+      'Center': WidgetType.CENTER,
+      'Sizedbox': WidgetType.SIZED_BOX,
+      'Scaffold': WidgetType.SCAFFOLD,
+      'Appbar': WidgetType.APP_BAR,
       'Textfield': WidgetType.TEXT_FIELD,
       'Elevatedbutton': WidgetType.ELEVATED_BUTTON,
       'Textbutton': WidgetType.TEXT_BUTTON,
@@ -79,14 +465,6 @@ export class WidgetRegistryService {
       'Textformfield': WidgetType.TEXT_FORM_FIELD,
       'Listview': WidgetType.LIST_VIEW,
       'Gridview': WidgetType.GRID_VIEW,
-      'Circleavatar': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
-      'Navigatablecontainer': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
-      'Navigatabletext': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
-      'Navigatablecard': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
-      'Navigatableicon': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
-      'Navigatablebutton': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
-      'Navigatablecolumn': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
-      'Singlechildscrollview': WidgetType.CUSTOM, // Map to CUSTOM or add to enum if needed
       'Expanded': WidgetType.EXPANDED,
       'Flexible': WidgetType.FLEXIBLE,
       'Wrap': WidgetType.WRAP,
@@ -110,127 +488,90 @@ export class WidgetRegistryService {
       'Card': WidgetType.CARD,
       'Image': WidgetType.IMAGE,
       'Icon': WidgetType.ICON,
-      // Add more mappings as needed for your specific backend types
     };
 
-    return directMap[pascalCaseType] || (pascalCaseType as WidgetType);
+    return directMap[pascalCaseType] || WidgetType.CUSTOM;
   }
 
-  // Helper to map backend category strings to frontend WidgetCategory enum
   private mapBackendCategoryToFrontend(backendCategory: string): WidgetCategory {
     switch (backendCategory.toLowerCase()) {
       case 'layout': return WidgetCategory.LAYOUT;
-      case 'display': return WidgetCategory.BASIC; // Basic for general display widgets
+      case 'display': return WidgetCategory.BASIC;
       case 'input': return WidgetCategory.FORM;
       case 'navigation': return WidgetCategory.NAVIGATION;
       case 'material': return WidgetCategory.MATERIAL;
-      // Add more mappings as needed
       default: return WidgetCategory.BASIC;
     }
   }
 
-  // Helper to map backend icon names to actual icon characters/codes
   private mapBackendIconToFrontend(backendIconName: string): string {
-    // This is a simplified mapping. You might need a comprehensive map
-    // or use a font icon library (like Material Icons) directly in your HTML.
     const iconMap: { [key: string]: string } = {
-      'crop_square': '□', 'view_column': '⬇', 'view_stream': '➡', 'layers': '⬚',
-      'center_focus_strong': '⊕', 'format_indent_increase': '▫', 'unfold_more': '↔',
-      'crop_din': '▭', 'text_fields': 'T', 'image': '🖼️', 'insert_emoticon': '✦',
-      'refresh': '⟳', 'linear_scale': '▬▬▬', 'horizontal_rule': '─', 'label': '🏷️',
-      'smart_button': '🔘', 'text_snippet': '📄', 'crop_16_9': '🔳', 'touch_app': '👆',
-      'add_circle': '➕', 'input': '📝', 'edit_note': '✍️', 'check_box': '✅',
-      'toggle_on': '💡', 'radio_button_checked': '◉', 'tune': '🎚️', 'arrow_drop_down': '🔽',
-      'credit_card': '💳', 'list_alt': '📋', 'dashboard': '🏠', 'web_asset': '🌐',
-      'menu': '☰', 'navigation': '🗺️', 'tab': '🗂️', 'announcement': '📢',
-      'warning': '⚠️', 'vertical_align_bottom': '⬇️', 'expand_more': '⬇️',
-      'format_list_numbered': '🔢', 'opacity': '👻', 'transform': '🔄',
-      'visibility': '👁️', 'grid_on': '▦', 'list': '☰', 'dynamic_form': '📝',
-      'verified': '✔️', 'account_circle': '👤', 'swap_vert': '↕️', 'grid_view': '🖼️',
-      'drag_handle': '✋', 'timeline': '📈', 'blur_on': '🌫️', 'format_paint': '🖌️',
-      'campaign': '📣', 'view_sidebar': '➡️', 'view_carousel': '🎠', 'view_quilt': '🧩',
-      'brush': '🖌️', 'block': '🚫', 'height': '📏', 'width': '📐', 'crop_free': '✂️',
-      'fullscreen': '📺', 'more_vert': '⋮', 'checklist': '✅', 'filter_alt': '🎛️',
-      'view_week': '🗓️', 'phone_android': '📱', 'shopping_bag': '🛍️', 'face': '😊',
-      'sports_soccer': '⚽', 'home': '🏠', 'menu_book': '📚', 'toys': '🧸',
-      'shopping_basket': '🧺', 'directions_car': '🚗', 'favorite': '❤️', 'music_note': '🎵',
-      'pets': '🐾', 'laptop': '💻', 'camera_alt': '📷', 'headphones': '🎧',
-      'watch': '⌚', 'headset': '🎧', 'local_shipping': '🚚', 'local_offer': '🏷️',
-      'arrow_forward_ios': '➡️', 'check_circle': '✅', 'remove_circle_outline': '➖',
-      'add_circle_outline': '➕', 'delete_outline': '🗑️', 'lock': '🔒', 'radio_button_unchecked': '⚪',
-      'notifications': '🔔', 'visibility_off': '🚫', 'help': '❓', 'error_outline': '❗',
-      'logout': '🚪', 'email': '📧', 'access_time': '⏰', 'sort': '⇅', 'tune': '🎛️',
-      'checkroom': '👕', 'phone': '📞', 'location_on': '📍', 'check_box_outline_blank': '⬜'
+      'crop_square': '□',
+      'view_column': '⬇',
+      'view_stream': '➡',
+      'layers': '⬚',
+      'center_focus_strong': '⊕',
+      'format_indent_increase': '▫',
+      'text_fields': 'T',
+      'image': '🖼️',
+      'smart_button': '🔘',
+      'input': '📝'
     };
     return iconMap[backendIconName.toLowerCase()] || '?';
   }
 
-  // Helper to parse backend property strings into frontend types
   private parseBackendProperties(backendProps: any, widgetType: WidgetType): any {
     const parsedProps: any = {};
+
     for (const key in backendProps) {
       if (backendProps.hasOwnProperty(key)) {
         let value = backendProps[key];
 
-        // Handle specific known string formats from backend
         if (typeof value === 'string') {
           if (value.startsWith('Colors.')) {
-            // Simple color mapping (e.g., 'Colors.blue' -> '#2196F3')
             parsedProps[key] = this.mapFlutterColorToHex(value);
-          } else if (value.startsWith('EdgeInsets.all(')) {
-            const num = parseFloat(value.match(/\d+(\.\d+)?/)![0]);
-            parsedProps[key] = createEdgeInsets(num);
-          } else if (value.startsWith('EdgeInsets.symmetric(')) {
-            const match = value.match(/horizontal:\s*(\d+(\.\d+)?),\s*vertical:\s*(\d+(\.\d+)?)/);
-            if (match) {
-              parsedProps[key] = createEdgeInsets({
-                left: parseFloat(match[1]),
-                right: parseFloat(match[1]),
-                top: parseFloat(match[3]),
-                bottom: parseFloat(match[3])
-              });
-            } else {
-              parsedProps[key] = createEdgeInsets(0); // Fallback
-            }
+          } else if (value.startsWith('EdgeInsets.')) {
+            parsedProps[key] = this.parseEdgeInsets(value);
           } else if (value.startsWith('MainAxisAlignment.')) {
-            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'MainAxisAlignment.center' -> 'center'
+            parsedProps[key] = value.split('.')[1].toLowerCase();
           } else if (value.startsWith('CrossAxisAlignment.')) {
-            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'CrossAxisAlignment.start' -> 'start'
-          } else if (value.startsWith('MainAxisSize.')) {
-            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'MainAxisSize.min' -> 'min'
+            parsedProps[key] = value.split('.')[1].toLowerCase();
           } else if (value.startsWith('Alignment.')) {
-            parsedProps[key] = value.split('.')[1]; // 'Alignment.topLeft' -> 'topLeft'
-          } else if (value.startsWith('FontWeight.')) {
-            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'FontWeight.bold' -> 'bold'
-          } else if (value.startsWith('FontStyle.')) {
-            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'FontStyle.italic' -> 'italic'
-          } else if (value.startsWith('TextAlign.')) {
-            parsedProps[key] = value.split('.')[1].toLowerCase(); // 'TextAlign.center' -> 'center'
-          } else if (value.startsWith('Icons.')) {
-            parsedProps[key] = value.split('.')[1]; // 'Icons.search' -> 'search'
+            parsedProps[key] = value.split('.')[1];
           } else if (value === 'true' || value === 'false') {
             parsedProps[key] = (value === 'true');
           } else if (!isNaN(Number(value)) && !isNaN(parseFloat(value))) {
             parsedProps[key] = parseFloat(value);
-          } else if (value.startsWith('TextStyle(') || value.startsWith('InputDecoration(') || value.startsWith('BoxDecoration(') || value.startsWith('ElevatedButton.styleFrom(') || value.startsWith('RoundedRectangleBorder(')) {
-            // For complex Flutter objects, store as string for now or parse more deeply if needed
-            // For simplicity, we'll just store the raw string for now if not directly handled by a specific editor
-            parsedProps[key] = value;
           } else {
-            parsedProps[key] = value; // Keep as is if no specific parsing rule
+            parsedProps[key] = value;
           }
-        } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-          // Recursively parse nested objects (e.g., 'margin', 'padding' if they are objects)
-          parsedProps[key] = this.parseBackendProperties(value, widgetType);
         } else {
           parsedProps[key] = value;
         }
       }
     }
+
     return parsedProps;
   }
 
-  // Simplified Flutter Color to Hex mapping
+  private parseEdgeInsets(value: string): any {
+    if (value.includes('all(')) {
+      const num = parseFloat(value.match(/\d+(\.\d+)?/)![0]);
+      return createEdgeInsets(num);
+    } else if (value.includes('symmetric(')) {
+      const match = value.match(/horizontal:\s*(\d+(\.\d+)?),\s*vertical:\s*(\d+(\.\d+)?)/);
+      if (match) {
+        return createEdgeInsets({
+          left: parseFloat(match[1]),
+          right: parseFloat(match[1]),
+          top: parseFloat(match[3]),
+          bottom: parseFloat(match[3])
+        });
+      }
+    }
+    return createEdgeInsets(0);
+  }
+
   private mapFlutterColorToHex(flutterColor: string): string {
     const colorMap: { [key: string]: string } = {
       'Colors.blue': '#2196F3',
@@ -239,49 +580,12 @@ export class WidgetRegistryService {
       'Colors.grey': '#9E9E9E',
       'Colors.red': '#F44336',
       'Colors.green': '#4CAF50',
-      'Colors.orange': '#FF9800',
-      'Colors.yellow': '#FFEB3B',
-      'Colors.purple': '#9C27B0',
-      'Colors.pink': '#E91E63',
-      'Colors.teal': '#009688',
-      'Colors.indigo': '#3F51B5',
-      'Colors.cyan': '#00BCD4',
-      'Colors.amber': '#FFC107',
-      'Colors.deepOrange': '#FF5722',
-      'Colors.blueGrey': '#607D8B',
-      'Colors.brown': '#795548',
-      'Colors.lightBlue': '#03A9F4',
-      'Colors.lightGreen': '#8BC34A',
-      'Colors.lime': '#CDDC39',
-      'Colors.deepPurple': '#673AB7',
-      'Colors.transparent': 'transparent',
-      'Colors.black54': 'rgba(0,0,0,0.54)', // Example for opacity
-      'Colors.grey[200]': '#EEEEEE',
-      'Colors.grey[300]': '#E0E0E0',
-      'Colors.grey[400]': '#BDBDBD',
-      'Colors.grey[500]': '#9E9E9E',
-      'Colors.grey[600]': '#757575',
-      'Colors.grey[700]': '#616161',
-      'Colors.grey[800]': '#424242',
-      'Colors.grey[900]': '#212121',
-      // Add more shades as needed
+      'Colors.transparent': 'transparent'
     };
-    return colorMap[flutterColor] || '#000000'; // Default to black if not found
+    return colorMap[flutterColor] || '#000000';
   }
 
-  // Existing methods (keep as is, they will now use dynamic definitions)
-  getWidgetDefinition(type: WidgetType): WidgetDefinition | undefined {
-    return this.widgetDefinitions.get(type);
-  }
-
-  getAllWidgetDefinitions(): WidgetDefinition[] {
-    return Array.from(this.widgetDefinitions.values());
-  }
-
-  getWidgetsByCategory(category: WidgetCategory): WidgetDefinition[] {
-    return this.getAllWidgetDefinitions().filter(def => def.category === category);
-  }
-
+  // Existing methods
   createWidget(type: WidgetType, properties?: Partial<FlutterWidget['properties']>): FlutterWidget {
     const definition = this.getWidgetDefinition(type);
     if (!definition) {
@@ -311,11 +615,11 @@ export class WidgetRegistryService {
     return definition?.maxChildren;
   }
 
-  // Keep createSampleWidgetTree for initial canvas load if no screen is selected
+  getWidgetsByCategory(category: WidgetCategory): EnhancedWidgetDefinition[] {
+    return this.getAllWidgetDefinitions().filter(def => def.category === category);
+  }
+
   createSampleWidgetTree(): FlutterWidget {
-    // This method can remain for initial setup or be removed if all screens are from backend
-    // For now, let's keep it as a fallback or initial state.
-    // Ensure it uses dynamically registered widgets if possible, or basic ones.
     const scaffold = this.createWidget(WidgetType.SCAFFOLD);
     const column = this.createWidget(WidgetType.COLUMN, {
       mainAxisAlignment: MainAxisAlignment.CENTER,
@@ -328,7 +632,6 @@ export class WidgetRegistryService {
     column.children.push(container);
     scaffold.children.push(column);
 
-    // Update parent references (important for tree structure)
     this.updateParentReferences(scaffold);
 
     return scaffold;

@@ -109,6 +109,9 @@ export interface WidgetProperties {
   borderColor?: string;
   borderWidth?: number;
   autofocus?: boolean;
+
+  // Index signature to allow any additional properties from backend
+  [key: string]: any;
 }
 
 export interface EdgeInsets {

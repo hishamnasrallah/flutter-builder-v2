@@ -1,7 +1,6 @@
 // src/app/core/services/property-editor.service.ts
-import {Injectable} from '@angular/core';
-import {BehaviorSubject, combineLatest} from 'rxjs';
-import {map, takeUntil} from 'rxjs/operators'; // Added map
+import { Injectable } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
 import {
   FlutterWidget,
   WidgetType,
@@ -13,17 +12,17 @@ import {
   FontWeight,
   FontStyle,
   TextAlign,
-  EdgeInsets, // Import EdgeInsets
+  EdgeInsets,
 } from '../models/flutter-widget.model';
-import {CanvasStateService} from './canvas-state.service';
-import {WidgetTreeService} from './widget-tree.service';
-import {NotificationService} from './notification.service';
-import {WidgetRegistryService} from './widget-registry.service'; // Import WidgetRegistryService
+import { CanvasStateService } from './canvas-state.service';
+import { WidgetTreeService } from './widget-tree.service';
+import { NotificationService } from './notification.service';
+import { WidgetRegistryService, PropertyMetadata } from './widget-registry.service';
 
 export interface PropertyDefinition {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'color' | 'select' | 'spacing' | 'boolean' | 'alignment';
+  type: 'text' | 'number' | 'color' | 'select' | 'spacing' | 'boolean' | 'alignment' | 'icon' | 'decoration' | 'border';
   category: string;
   defaultValue: any;
   options?: { label: string; value: any }[];
@@ -56,11 +55,14 @@ export class PropertyEditorService {
   private currentWidgetSubject = new BehaviorSubject<FlutterWidget | null>(null);
   public currentWidget$ = this.currentWidgetSubject.asObservable();
 
+  // Cache for property definitions to improve performance
+  private propertyCache = new Map<string, PropertyCategory[]>();
+
   constructor(
     private canvasState: CanvasStateService,
     private treeService: WidgetTreeService,
     private notification: NotificationService,
-    private widgetRegistry: WidgetRegistryService // Inject WidgetRegistryService
+    private widgetRegistry: WidgetRegistryService
   ) {
     this.subscribeToSelection();
   }
@@ -71,262 +73,459 @@ export class PropertyEditorService {
     });
   }
 
-  // This method now dynamically generates properties based on the WidgetDefinition
   getPropertiesForWidget(widget: FlutterWidget | null): PropertyCategory[] {
     if (!widget) return [];
+
+    // Check cache first
+    const cacheKey = `${widget.type}_${JSON.stringify(Object.keys(widget.properties))}`;
+    if (this.propertyCache.has(cacheKey)) {
+      return this.propertyCache.get(cacheKey)!;
+    }
 
     const definition = this.widgetRegistry.getWidgetDefinition(widget.type);
     if (!definition) {
       console.warn(`No widget definition found for type: ${widget.type}`);
-      return [];
+      return this.generateFallbackProperties(widget);
     }
 
     const categories = new Map<string, PropertyDefinition[]>();
 
-    // Iterate over default_properties from the definition
-    for (const key in definition.defaultProperties) {
-      if (definition.defaultProperties.hasOwnProperty(key)) {
-        const defaultValue = definition.defaultProperties[key];
-        const propertyType = this.determinePropertyType(key, defaultValue);
-        const categoryName = this.determinePropertyCategory(key, widget.type); // Determine category dynamically
+    // Get metadata from enhanced widget definition
+    if (definition.propertyMetadata) {
+      definition.propertyMetadata.forEach((metadata, key) => {
+        // Check if property exists in widget
+        const currentValue = this.getNestedProperty(widget.properties, key);
 
-        if (!categories.has(categoryName)) {
-          categories.set(categoryName, []);
+        const propertyDef = this.createPropertyDefinition(
+          metadata,
+          currentValue !== undefined ? currentValue : metadata.defaultValue
+        );
+
+        if (!categories.has(metadata.category)) {
+          categories.set(metadata.category, []);
         }
+        categories.get(metadata.category)!.push(propertyDef);
+      });
+    }
 
-        // Create a basic PropertyDefinition. You'll need to expand this
-        // to include validation, options, min/max, etc., based on your needs.
-        // This is a simplified mapping.
-        const propDef: PropertyDefinition = {
-          key: key,
-          label: this.humanizePropertyLabel(key),
-          type: propertyType,
-          category: categoryName,
-          defaultValue: defaultValue,
-          // Add more specific properties like options, min, max, step, unit, validation, dependsOn
-          // based on your backend's `properties_mapping` or hardcoded rules for common types.
-          options: this.getOptionsForProperty(key),
-          min: this.getMinForProperty(key),
-          max: this.getMaxForProperty(key),
-          step: this.getStepForProperty(key),
-          unit: this.getUnitForProperty(key),
-          validation: this.getValidationForProperty(key),
-          dependsOn: this.getDependsOnForProperty(key)
-        };
-        categories.get(categoryName)!.push(propDef);
+    // Also check for any properties in the widget that aren't in the definition
+    this.addDynamicProperties(widget, definition, categories);
+
+    // Convert to PropertyCategory array
+    const result = this.convertToPropertyCategories(categories);
+
+    // Cache the result
+    this.propertyCache.set(cacheKey, result);
+
+    return result;
+  }
+
+  private createPropertyDefinition(metadata: PropertyMetadata, currentValue: any): PropertyDefinition {
+    return {
+      key: metadata.key,
+      label: this.humanizePropertyLabel(metadata.key),
+      type: metadata.type,
+      category: metadata.category,
+      defaultValue: metadata.defaultValue,
+      options: metadata.options,
+      min: metadata.min,
+      max: metadata.max,
+      step: metadata.step,
+      unit: metadata.unit,
+      validation: this.generateValidation(metadata),
+      dependsOn: metadata.dependsOn
+    };
+  }
+
+  private generateValidation(metadata: PropertyMetadata): ValidationRule[] | undefined {
+    const rules: ValidationRule[] = [];
+
+    // Add validation based on property type and metadata
+    if (metadata.type === 'text' && metadata.key.toLowerCase().includes('name')) {
+      rules.push({
+        type: 'required',
+        message: `${this.humanizePropertyLabel(metadata.key)} is required`
+      });
+    }
+
+    if (metadata.type === 'number') {
+      if (metadata.min !== undefined) {
+        rules.push({
+          type: 'min',
+          value: metadata.min,
+          message: `Value must be at least ${metadata.min}`
+        });
+      }
+      if (metadata.max !== undefined) {
+        rules.push({
+          type: 'max',
+          value: metadata.max,
+          message: `Value must be at most ${metadata.max}`
+        });
       }
     }
 
-    // Convert to PropertyCategory array and sort
-    return Array.from(categories.entries()).map(([name, properties]) => ({
-      name,
-      icon: this.getCategoryIcon(name),
-      properties: properties.sort((a, b) => a.label.localeCompare(b.label)), // Sort properties alphabetically
-      expanded: true // Default to expanded
-    })).sort((a, b) => a.name.localeCompare(b.name)); // Sort categories alphabetically
+    return rules.length > 0 ? rules : undefined;
   }
 
-  private determinePropertyType(key: string, value: any): PropertyDefinition['type'] {
-    if (key.toLowerCase().includes('color')) return 'color';
-    if (key.toLowerCase().includes('padding') || key.toLowerCase().includes('margin')) return 'spacing';
-    if (key.toLowerCase().includes('alignment')) return 'alignment';
-    if (typeof value === 'boolean') return 'boolean';
-    if (typeof value === 'number') return 'number';
-    if (typeof value === 'string' && (key.toLowerCase().includes('axisalignment') || key.toLowerCase().includes('axissize') || key.toLowerCase().includes('fontweight') || key.toLowerCase().includes('fontstyle') || key.toLowerCase().includes('textalign') || key.toLowerCase().includes('icon') || key.toLowerCase().includes('scrolldirection'))) return 'select';
-    return 'text';
-  }
+  private addDynamicProperties(
+    widget: FlutterWidget,
+    definition: any,
+    categories: Map<string, PropertyDefinition[]>
+  ): void {
+    // Check for properties in the widget that aren't in the definition
+    for (const key in widget.properties) {
+      if (!definition.propertyMetadata || !definition.propertyMetadata.has(key)) {
+        // This is a dynamic property not in the definition
+        const value = widget.properties[key];
+        const propertyDef = this.inferPropertyDefinition(key, value);
 
-  private determinePropertyCategory(key: string, widgetType: WidgetType): string {
-    // This logic can be expanded based on your backend's `widget_group` or `category`
-    // For now, a simple heuristic:
-    if (key.toLowerCase().includes('width') || key.toLowerCase().includes('height') || key.toLowerCase().includes('axisalignment') || key.toLowerCase().includes('axissize') || key.toLowerCase().includes('flex') || key.toLowerCase().includes('scroll')) return 'Layout';
-    if (key.toLowerCase().includes('padding') || key.toLowerCase().includes('margin')) return 'Spacing';
-    if (key.toLowerCase().includes('color') || key.toLowerCase().includes('decoration') || key.toLowerCase().includes('elevation') || key.toLowerCase().includes('radius') || key.toLowerCase().includes('border')) return 'Appearance';
-    if (key.toLowerCase().includes('text') || key.toLowerCase().includes('title') || key.toLowerCase().includes('icon') || key.toLowerCase().includes('hint')) return 'Content';
-    if (key.toLowerCase().includes('font')) return 'Typography';
-    if (key.toLowerCase().includes('autofocus')) return 'Behavior';
-    return 'General';
-  }
-
-  private humanizePropertyLabel(key: string): string {
-    return key.replace(/([A-Z])/g, ' $1') // Add space before capital letters
-      .replace(/([a-z])([0-9])/g, '$1 $2') // Add space between letter and number
-      .replace(/_/g, ' ') // Replace underscores with spaces
-      .replace(/\b\w/g, char => char.toUpperCase()) // Capitalize first letter of each word
-      .replace('Id', 'ID') // Specific correction
-      .trim();
-  }
-
-  private getOptionsForProperty(key: string): { label: string; value: any }[] | undefined {
-    switch (key) {
-      case 'mainAxisAlignment':
-        return Object.entries(MainAxisAlignment).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
-      case 'crossAxisAlignment':
-        return Object.entries(CrossAxisAlignment).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
-      case 'mainAxisSize':
-        return Object.entries(MainAxisSize).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
-      case 'alignment':
-        return Object.entries(Alignment).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
-      case 'fontWeight':
-        return Object.entries(FontWeight).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
-      case 'fontStyle':
-        return Object.entries(FontStyle).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
-      case 'textAlign':
-        return Object.entries(TextAlign).map(([k, v]) => ({label: this.humanizePropertyLabel(k), value: v}));
-      case 'scrollDirection':
-        return [{label: 'Vertical', value: 'vertical'}, {label: 'Horizontal', value: 'horizontal'}];
-      case 'icon': // For Icon widget's 'icon' property
-        return [
-          {label: 'Star', value: 'star'},
-          {label: 'Heart', value: 'heart'},
-          {label: 'Home', value: 'home'},
-          {label: 'Settings', value: 'settings'},
-          {label: 'User', value: 'user'},
-          {label: 'Search', value: 'search'},
-          {label: 'Menu', value: 'menu'},
-          {label: 'Close', value: 'close'},
-          {label: 'Check', value: 'check'},
-          {label: 'Arrow Back', value: 'arrow_back'},
-          {label: 'Arrow Forward', value: 'arrow_forward'},
-          {label: 'Phone', value: 'phone'},
-          {label: 'Laptop', value: 'laptop'},
-          {label: 'Camera', value: 'camera_alt'},
-          {label: 'Headphones', value: 'headphones'},
-          {label: 'Watch', value: 'watch'},
-          {label: 'Local Shipping', value: 'local_shipping'},
-          {label: 'Local Offer', value: 'local_offer'},
-          {label: 'Checkroom', value: 'checkroom'},
-          {label: 'Lock', value: 'lock'},
-          {label: 'Email', value: 'email'},
-          {label: 'Access Time', value: 'access_time'},
-          {label: 'Sort', value: 'sort'},
-          {label: 'Tune', value: 'tune'},
-          {label: 'Notifications', value: 'notifications'},
-          {label: 'Visibility', value: 'visibility'},
-          {label: 'Help', value: 'help'},
-          {label: 'Error Outline', value: 'error_outline'},
-          {label: 'Logout', value: 'logout'},
-          {label: 'Payment', value: 'payment'},
-          {label: 'Location On', value: 'location_on'},
-          {label: 'Check Box', value: 'check_box'},
-          {label: 'Check Box Outline Blank', value: 'check_box_outline_blank'},
-          {label: 'Radio Button Checked', value: 'radio_button_checked'},
-          {label: 'Radio Button Unchecked', value: 'radio_button_unchecked'},
-          {label: 'Shopping Cart', value: 'shopping_cart'},
-          {label: 'Person', value: 'person'},
-          {label: 'Sports Basketball', value: 'sports_basketball'},
-          {label: 'Music Note', value: 'music_note'},
-          {label: 'Pets', value: 'pets'},
-          {label: 'Shopping Basket', value: 'shopping_basket'},
-          {label: 'Directions Car', value: 'directions_car'},
-          {label: 'Sports Soccer', value: 'sports_soccer'},
-          {label: 'Mic', value: 'mic'},
-          {label: 'Speaker', value: 'speaker'},
-          {label: 'Phone Android', value: 'phone_android'},
-          {label: 'Gamepad', value: 'gamepad'},
-          {label: 'History', value: 'history'},
-          {label: 'Add', value: 'add'},
-          {label: 'Remove', value: 'remove'},
-          {label: 'Favorite Border', value: 'favorite_border'},
-          {label: 'Favorite', value: 'favorite'},
-          {label: 'Share', value: 'share'},
-          {label: 'Image', value: 'image'},
-          {label: 'Headset', value: 'headset'},
-          {label: 'Camera Alt', value: 'camera_alt'},
-          {label: 'Filter List', value: 'filter_list'},
-          {label: 'Delete', value: 'delete'},
-          {label: 'Edit', value: 'edit'},
-          {label: 'Check Circle', value: 'check_circle'},
-          {label: 'Remove Circle Outline', value: 'remove_circle_outline'},
-          {label: 'Add Circle Outline', value: 'add_circle_outline'},
-          {label: 'Visibility Off', value: 'visibility_off'},
-          {label: 'Help Outline', value: 'help_outline'},
-          {label: 'Menu Book', value: 'menu_book'},
-          {label: 'Toys', value: 'toys'}
-        ];
-      default:
-        return undefined;
+        if (!categories.has(propertyDef.category)) {
+          categories.set(propertyDef.category, []);
+        }
+        categories.get(propertyDef.category)!.push(propertyDef);
+      }
     }
   }
 
-  private getMinForProperty(key: string): number | undefined {
-    const minValues: { [key: string]: number } = {
+  private inferPropertyDefinition(key: string, value: any): PropertyDefinition {
+    const type = this.inferPropertyType(key, value);
+    const category = this.inferPropertyCategory(key);
+
+    return {
+      key: key,
+      label: this.humanizePropertyLabel(key),
+      type: type,
+      category: category,
+      defaultValue: value,
+      options: this.inferPropertyOptions(key, type),
+      min: this.inferMin(key, type),
+      max: this.inferMax(key, type),
+      step: this.inferStep(key, type),
+      unit: this.inferUnit(key, type)
+    };
+  }
+
+  private inferPropertyType(key: string, value: any): PropertyDefinition['type'] {
+    const keyLower = key.toLowerCase();
+
+    // Check key patterns first
+    if (keyLower.includes('color')) return 'color';
+    if (keyLower.includes('padding') || keyLower.includes('margin')) return 'spacing';
+    if (keyLower === 'alignment') return 'alignment';
+    if (keyLower === 'icon') return 'select';
+    if (keyLower.includes('decoration') && !keyLower.includes('color')) return 'decoration';
+    if (keyLower.includes('border') && !keyLower.includes('color') && !keyLower.includes('width') && !keyLower.includes('radius')) return 'border';
+
+    // Check value type
+    if (typeof value === 'boolean') return 'boolean';
+    if (typeof value === 'number') return 'number';
+
+    // Check if value matches known enum patterns
+    if (typeof value === 'string') {
+      if (this.isAlignmentValue(value)) return 'select';
+      if (this.isFontWeightValue(value)) return 'select';
+      if (this.isFontStyleValue(value)) return 'select';
+      if (this.isTextAlignValue(value)) return 'select';
+      if (value.startsWith('#') || value.startsWith('rgb')) return 'color';
+    }
+
+    // Check specific property names
+    if (keyLower === 'mainaxisalignment' || keyLower === 'crossaxisalignment' ||
+        keyLower === 'mainaxissize' || keyLower === 'fontweight' ||
+        keyLower === 'fontstyle' || keyLower === 'textalign' ||
+        keyLower === 'scrolldirection') {
+      return 'select';
+    }
+
+    return 'text';
+  }
+
+  private inferPropertyCategory(key: string): string {
+    const keyLower = key.toLowerCase();
+
+    if (keyLower.includes('width') || keyLower.includes('height') ||
+        keyLower.includes('flex') || keyLower.includes('alignment') ||
+        keyLower.includes('axis') || keyLower.includes('size') && !keyLower.includes('font')) {
+      return 'Layout';
+    }
+
+    if (keyLower.includes('padding') || keyLower.includes('margin')) {
+      return 'Spacing';
+    }
+
+    if (keyLower.includes('color') || keyLower.includes('decoration') ||
+        keyLower.includes('elevation') || keyLower.includes('radius') ||
+        keyLower.includes('border') || keyLower.includes('shadow')) {
+      return 'Appearance';
+    }
+
+    if (keyLower.includes('text') || keyLower.includes('title') ||
+        keyLower.includes('icon') || keyLower.includes('hint') ||
+        keyLower.includes('label') || keyLower.includes('placeholder')) {
+      return 'Content';
+    }
+
+    if (keyLower.includes('font')) {
+      return 'Typography';
+    }
+
+    if (keyLower.includes('enabled') || keyLower.includes('visible') ||
+        keyLower.includes('autofocus') || keyLower.includes('readonly') ||
+        keyLower.includes('obscure')) {
+      return 'Behavior';
+    }
+
+    return 'General';
+  }
+
+  private inferPropertyOptions(key: string, type: PropertyDefinition['type']): { label: string; value: any }[] | undefined {
+    const keyLower = key.toLowerCase();
+
+    if (keyLower === 'mainaxisalignment') {
+      return Object.entries(MainAxisAlignment).map(([k, v]) => ({
+        label: this.humanizePropertyLabel(k),
+        value: v
+      }));
+    }
+
+    if (keyLower === 'crossaxisalignment') {
+      return Object.entries(CrossAxisAlignment).map(([k, v]) => ({
+        label: this.humanizePropertyLabel(k),
+        value: v
+      }));
+    }
+
+    if (keyLower === 'mainaxissize') {
+      return Object.entries(MainAxisSize).map(([k, v]) => ({
+        label: this.humanizePropertyLabel(k),
+        value: v
+      }));
+    }
+
+    if (keyLower === 'fontweight') {
+      return Object.entries(FontWeight).map(([k, v]) => ({
+        label: k,
+        value: v
+      }));
+    }
+
+    if (keyLower === 'fontstyle') {
+      return Object.entries(FontStyle).map(([k, v]) => ({
+        label: this.humanizePropertyLabel(k),
+        value: v
+      }));
+    }
+
+    if (keyLower === 'textalign') {
+      return Object.entries(TextAlign).map(([k, v]) => ({
+        label: this.humanizePropertyLabel(k),
+        value: v
+      }));
+    }
+
+    if (keyLower === 'scrolldirection') {
+      return [
+        { label: 'Vertical', value: 'vertical' },
+        { label: 'Horizontal', value: 'horizontal' }
+      ];
+    }
+
+    if (keyLower === 'icon') {
+      return this.getIconOptions();
+    }
+
+    return undefined;
+  }
+
+  private inferMin(key: string, type: PropertyDefinition['type']): number | undefined {
+    if (type !== 'number') return undefined;
+
+    const keyLower = key.toLowerCase();
+    const minValues: { [pattern: string]: number } = {
       'width': 0,
       'height': 0,
-      'fontSize': 8,
+      'fontsize': 8,
       'elevation': 0,
-      'borderRadius': 0,
-      'borderWidth': 0,
+      'borderradius': 0,
+      'borderwidth': 0,
       'flex': 1,
       'size': 8,
-      'separatorHeight': 0
+      'opacity': 0,
+      'blur': 0
     };
-    return minValues[key];
+
+    for (const pattern in minValues) {
+      if (keyLower.includes(pattern)) {
+        return minValues[pattern];
+      }
+    }
+
+    return 0;
   }
 
-  private getMaxForProperty(key: string): number | undefined {
-    const maxValues: { [key: string]: number } = {
+  private inferMax(key: string, type: PropertyDefinition['type']): number | undefined {
+    if (type !== 'number') return undefined;
+
+    const keyLower = key.toLowerCase();
+    const maxValues: { [pattern: string]: number } = {
       'width': 1000,
       'height': 1000,
-      'fontSize': 72,
+      'fontsize': 72,
       'elevation': 24,
-      'borderRadius': 100,
-      'borderWidth': 20,
+      'borderradius': 100,
+      'borderwidth': 20,
       'flex': 10,
       'size': 128,
-      'separatorHeight': 50
+      'opacity': 1,
+      'blur': 20
     };
-    return maxValues[key];
+
+    for (const pattern in maxValues) {
+      if (keyLower.includes(pattern)) {
+        return maxValues[pattern];
+      }
+    }
+
+    return 100;
   }
 
-  private getStepForProperty(key: string): number | undefined {
-    const stepValues: { [key: string]: number } = {
-      'width': 10,
-      'height': 10,
-      'fontSize': 1,
-      'elevation': 1,
-      'borderRadius': 1,
-      'borderWidth': 1,
-      'flex': 1,
-      'size': 1,
-      'separatorHeight': 1
-    };
-    return stepValues[key] || 1;
+  private inferStep(key: string, type: PropertyDefinition['type']): number | undefined {
+    if (type !== 'number') return undefined;
+
+    const keyLower = key.toLowerCase();
+    if (keyLower.includes('opacity')) return 0.1;
+    if (keyLower.includes('flex')) return 1;
+
+    return 1;
   }
 
-  private getUnitForProperty(key: string): string | undefined {
-    const unitValues: { [key: string]: string } = {
+  private inferUnit(key: string, type: PropertyDefinition['type']): string | undefined {
+    if (type !== 'number') return undefined;
+
+    const keyLower = key.toLowerCase();
+    const unitMap: { [pattern: string]: string } = {
       'width': 'px',
       'height': 'px',
-      'fontSize': 'px',
-      'borderRadius': 'px',
-      'borderWidth': 'px',
+      'fontsize': 'px',
+      'borderradius': 'px',
+      'borderwidth': 'px',
       'size': 'px',
-      'separatorHeight': 'px'
+      'blur': 'px',
+      'elevation': 'dp'
     };
-    return unitValues[key];
+
+    for (const pattern in unitMap) {
+      if (keyLower.includes(pattern)) {
+        return unitMap[pattern];
+      }
+    }
+
+    return undefined;
   }
 
-  private getValidationForProperty(key: string): ValidationRule[] | undefined {
-    const validationRules: { [key: string]: ValidationRule[] } = {
-      'text': [{type: 'required', message: 'Text cannot be empty'}],
-      'title': [{type: 'required', message: 'Title cannot be empty'}],
-      'name': [{type: 'required', message: 'Name cannot be empty'}],
-      'width': [{type: 'min', value: 0, message: 'Width must be positive'}],
-      'height': [{type: 'min', value: 0, message: 'Height must be positive'}],
-      'fontSize': [
-        {type: 'min', value: 8, message: 'Font size must be at least 8'},
-        {type: 'max', value: 72, message: 'Font size must be less than 72'}
-      ]
-    };
-    return validationRules[key];
+  private getIconOptions(): { label: string; value: any }[] {
+    return [
+      { label: 'Star', value: 'star' },
+      { label: 'Heart', value: 'heart' },
+      { label: 'Home', value: 'home' },
+      { label: 'Settings', value: 'settings' },
+      { label: 'User', value: 'user' },
+      { label: 'Search', value: 'search' },
+      { label: 'Menu', value: 'menu' },
+      { label: 'Close', value: 'close' },
+      { label: 'Check', value: 'check' },
+      { label: 'Arrow Back', value: 'arrow_back' },
+      { label: 'Arrow Forward', value: 'arrow_forward' },
+      { label: 'Phone', value: 'phone' },
+      { label: 'Email', value: 'email' },
+      { label: 'Camera', value: 'camera_alt' },
+      { label: 'Location', value: 'location_on' },
+      { label: 'Share', value: 'share' },
+      { label: 'Favorite', value: 'favorite' },
+      { label: 'Shopping Cart', value: 'shopping_cart' },
+      { label: 'Notifications', value: 'notifications' },
+      { label: 'Add', value: 'add' },
+      { label: 'Remove', value: 'remove' },
+      { label: 'Edit', value: 'edit' },
+      { label: 'Delete', value: 'delete' }
+    ];
   }
 
-  private getDependsOnForProperty(key: string): string[] | undefined {
-    const dependencies: { [key: string]: string[] } = {
-      'decoration.border.color': ['decoration.border.width']
-    };
-    return dependencies[key];
+  private isAlignmentValue(value: string): boolean {
+    const alignmentValues = Object.values(Alignment);
+    return alignmentValues.includes(value as any);
+  }
+
+  private isFontWeightValue(value: string): boolean {
+    const fontWeightValues = Object.values(FontWeight);
+    return fontWeightValues.includes(value as any);
+  }
+
+  private isFontStyleValue(value: string): boolean {
+    const fontStyleValues = Object.values(FontStyle);
+    return fontStyleValues.includes(value as any);
+  }
+
+  private isTextAlignValue(value: string): boolean {
+    const textAlignValues = Object.values(TextAlign);
+    return textAlignValues.includes(value as any);
+  }
+
+  private convertToPropertyCategories(categories: Map<string, PropertyDefinition[]>): PropertyCategory[] {
+    const categoryOrder = ['Content', 'Layout', 'Spacing', 'Appearance', 'Typography', 'Behavior', 'General'];
+    const result: PropertyCategory[] = [];
+
+    // Add categories in order
+    categoryOrder.forEach(categoryName => {
+      if (categories.has(categoryName)) {
+        result.push({
+          name: categoryName,
+          icon: this.getCategoryIcon(categoryName),
+          properties: categories.get(categoryName)!.sort((a, b) => a.label.localeCompare(b.label)),
+          expanded: true
+        });
+      }
+    });
+
+    // Add any remaining categories not in the order
+    categories.forEach((properties, categoryName) => {
+      if (!categoryOrder.includes(categoryName)) {
+        result.push({
+          name: categoryName,
+          icon: this.getCategoryIcon(categoryName),
+          properties: properties.sort((a, b) => a.label.localeCompare(b.label)),
+          expanded: true
+        });
+      }
+    });
+
+    return result;
+  }
+
+  private generateFallbackProperties(widget: FlutterWidget): PropertyCategory[] {
+    const categories = new Map<string, PropertyDefinition[]>();
+
+    // Generate properties from the widget's current properties
+    for (const key in widget.properties) {
+      const value = widget.properties[key];
+      const propertyDef = this.inferPropertyDefinition(key, value);
+
+      if (!categories.has(propertyDef.category)) {
+        categories.set(propertyDef.category, []);
+      }
+      categories.get(propertyDef.category)!.push(propertyDef);
+    }
+
+    return this.convertToPropertyCategories(categories);
+  }
+
+  private humanizePropertyLabel(key: string): string {
+    return key.replace(/([A-Z])/g, ' $1')
+      .replace(/([a-z])([0-9])/g, '$1 $2')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, char => char.toUpperCase())
+      .trim();
   }
 
   private getCategoryIcon(category: string): string {
@@ -350,17 +549,16 @@ export class PropertyEditorService {
         return;
       }
 
-      // Deep clone the widget
-      const updatedWidget = JSON.parse(JSON.stringify(widget));
+      // Clear cache for this widget type
+      this.propertyCache.clear();
 
-      // Update the property using path (e.g., "decoration.border.width")
+      const updatedWidget = JSON.parse(JSON.stringify(widget));
       this.setNestedProperty(updatedWidget.properties, propertyPath, value);
 
-      // Update the widget tree
       const currentRoot = this.canvasState.currentState.rootWidget;
       if (currentRoot) {
         const updatedRoot = this.updateWidgetInTree(currentRoot, widgetId, updatedWidget);
-        this.canvasState.updateState({rootWidget: updatedRoot});
+        this.canvasState.updateState({ rootWidget: updatedRoot });
       }
     } catch (error) {
       console.error('Failed to update property:', error);
@@ -404,7 +602,7 @@ export class PropertyEditorService {
 
   private updateWidgetInTree(root: FlutterWidget, widgetId: string, updatedWidget: FlutterWidget): FlutterWidget {
     if (root.id === widgetId) {
-      return {...updatedWidget, children: root.children};
+      return { ...updatedWidget, children: root.children };
     }
 
     return {
@@ -448,9 +646,9 @@ export class PropertyEditorService {
     const definition = this.widgetRegistry.getWidgetDefinition(widget.type);
     if (!definition) return;
 
-    const defaultValue = this.getNestedProperty(definition.defaultProperties, propertyPath);
-    if (defaultValue !== undefined) {
-      this.updateProperty(widgetId, propertyPath, defaultValue);
+    const metadata = this.widgetRegistry.getPropertyMetadata(widget.type, propertyPath);
+    if (metadata) {
+      this.updateProperty(widgetId, propertyPath, metadata.defaultValue);
     }
   }
 
@@ -461,14 +659,13 @@ export class PropertyEditorService {
     const definition = this.widgetRegistry.getWidgetDefinition(widget.type);
     if (!definition) return;
 
-    // Update all properties to default values
     const updatedWidget = JSON.parse(JSON.stringify(widget));
     updatedWidget.properties = JSON.parse(JSON.stringify(definition.defaultProperties));
 
     const currentRoot = this.canvasState.currentState.rootWidget;
     if (currentRoot) {
       const updatedRoot = this.updateWidgetInTree(currentRoot, widgetId, updatedWidget);
-      this.canvasState.updateState({rootWidget: updatedRoot});
+      this.canvasState.updateState({ rootWidget: updatedRoot });
     }
   }
 }
